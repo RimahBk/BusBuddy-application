@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome – BusBuddy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-data.js"></script>
+  <script src="js/app.js"></script>
+  <style>
+    /* Welcome page only */
+    .hero { text-align: center; padding: 28px 0 8px; max-width: 640px; margin: 0 auto; }
+    .hero h1 { font-size: 30px; margin-bottom: 10px; }
+    .hero .lead { font-size: 17px; color: var(--muted); margin-bottom: 22px; }
+    .hero-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hero-buttons .btn { font-size: 17px; min-height: 54px; }
+    .account-links { margin: 18px 0 0; font-size: 15px; }
+    .account-links a { font-weight: bold; }
+    .features { margin-top: 36px; }
+    .features .card + .card { margin-top: 0; }   /* the grid gap already spaces the cards */
+    .feature .icon { font-size: 26px; margin-bottom: 6px; }
+    .feature p { margin: 0; }
+    @media (max-width: 520px) {
+      .hero h1 { font-size: 25px; }
+      .hero-buttons { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header id="topbar"></header>
+
+  <main class="container">
+    <!-- Big welcome block -->
+    <section class="hero">
+      <h1>Track your bus from the Chouf to LIU Cola</h1>
+      <p class="lead">See where your bus is right now, when it will reach your stop, and reserve your seat before you leave home.</p>
+
+      <div class="hero-buttons">
+        <a class="btn" href="map.html">🗺️ See live buses</a>
+        <a class="btn btn-outline" href="schedules.html">🕒 Bus schedules</a>
+      </div>
+
+      <!-- Shown to visitors who are not logged in -->
+      <p class="account-links" id="guestLinks">
+        <a href="login.html">Log in</a> &nbsp;·&nbsp; <a href="register.html">Create an account</a>
+      </p>
+
+      <!-- Shown instead when someone is already logged in -->
+      <p class="account-links hidden" id="userLinks">
+        <a class="btn btn-purple" id="homeBtn" href="map.html">Go to my page</a>
+      </p>
+    </section>
+
+    <!-- Three short feature cards -->
+    <section class="features grid-3">
+      <div class="card feature">
+        <div class="icon">📍</div>
+        <div class="card-title">Live map &amp; arrival times</div>
+        <p class="muted">Follow every bus on the map and see when it reaches your stop. No account needed.</p>
+      </div>
+      <div class="card feature">
+        <div class="icon">💺</div>
+        <div class="card-title">Reserve a seat</div>
+        <p class="muted">Create a free account to book a seat on an upcoming trip and see how many seats are left.</p>
+      </div>
+      <div class="card feature">
+        <div class="icon">📞</div>
+        <div class="card-title">Call or message your driver</div>
+        <p class="muted">Running late or waiting by the road? Call your driver or send a message from your booking.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">BusBuddy · LIU senior project</footer>
+
+  <script>
+    BB.ready(async () => {
+      // 1. Draw the top navigation bar (no item is highlighted on the welcome page)
+      await BB.renderNav("index.html");
+      if (!BB.db) return;                       // setup not done yet – the banner explains
+
+      // 2. If someone is already logged in, swap "Log in / Create an account"
+      //    for one button that takes them to their own home page
+      const user = await BB.getUser();
+      if (user) {
+        BB.$("#homeBtn").href = BB.homeFor(user.type);
+        BB.$("#guestLinks").classList.add("hidden");
+        BB.$("#userLinks").classList.remove("hidden");
+      }
+    });
+  </script>
+</body>
+</html>

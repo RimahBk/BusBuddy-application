@@ -1,0 +1,254 @@
+/* =====================================================================
+   BusBuddy – shared style for every page
+   Simple, mobile-first, and friendly to an Android WebView.
+   ===================================================================== */
+
+:root {
+  --green: #0F6E56;
+  --green-dark: #08503F;
+  --green-light: #E1F5EE;
+  --purple: #534AB7;
+  --purple-light: #EEEDFE;
+  --amber: #B26A00;
+  --amber-light: #FFF3DC;
+  --red: #A32D2D;
+  --red-light: #FCEBEB;
+  --text: #1F2A28;
+  --muted: #5B6670;
+  --border: #D5DCD9;
+  --bg: #F4F7F6;
+  --white: #FFFFFF;
+  --radius: 10px;
+  --shadow: 0 2px 10px rgba(8, 80, 63, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: var(--green); }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 12px; }
+h1 { font-size: 24px; color: var(--green-dark); }
+h2 { font-size: 20px; color: var(--green-dark); }
+h3 { font-size: 17px; }
+p { margin: 0 0 12px; }
+.muted { color: var(--muted); font-size: 14px; }
+.hidden { display: none !important; }
+
+/* ---------- Top bar (filled by BB.renderNav) ---------- */
+#topbar {
+  background: var(--green-dark);
+  color: var(--white);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+.topbar-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.brand {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--white); text-decoration: none; font-weight: bold; font-size: 19px;
+  margin-right: auto;
+}
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 7px;
+  background: var(--white); color: var(--green-dark);
+  display: grid; place-items: center; font-size: 16px;
+}
+.nav-toggle {
+  display: none;
+  background: none; border: 1px solid rgba(255,255,255,.5); color: var(--white);
+  border-radius: 6px; padding: 6px 10px; font-size: 15px; cursor: pointer;
+}
+.nav-links { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.nav-links a, .nav-links button {
+  color: var(--white); text-decoration: none; font-size: 15px;
+  padding: 8px 10px; border-radius: 6px; background: none; border: none; cursor: pointer;
+  font-family: inherit;
+}
+.nav-links a:hover, .nav-links button:hover { background: rgba(255,255,255,.12); }
+.nav-links a.active { background: rgba(255,255,255,.2); font-weight: bold; }
+.nav-user { font-size: 13px; opacity: .85; padding: 0 6px; }
+
+@media (max-width: 720px) {
+  .nav-toggle { display: block; }
+  .nav-links { display: none; width: 100%; flex-direction: column; align-items: stretch; }
+  .nav-links.open { display: flex; }
+  .nav-links a, .nav-links button { text-align: left; padding: 12px 10px; }
+}
+
+/* ---------- Page layout ---------- */
+main.container, .container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  flex: 1;
+}
+main.container.narrow, .container.narrow, .narrow { max-width: 440px; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 820px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row-between { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.stack > * + * { margin-top: 12px; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 14px; }
+.grid-2 > .card + .card, .grid-3 > .card + .card { margin-top: 0; }   /* grids space their own cards */
+.card-title { font-weight: bold; font-size: 17px; margin-bottom: 4px; }
+
+/* ---------- Forms ---------- */
+label { display: block; font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+.field { margin-bottom: 14px; }
+input, select, textarea {
+  width: 100%;
+  padding: 11px 12px;
+  font-size: 16px;               /* 16px stops phones from zooming in */
+  font-family: inherit;
+  color: var(--text);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+textarea { resize: vertical; min-height: 80px; }
+input:focus, select:focus, textarea:focus { outline: 3px solid var(--green-light); border-color: var(--green); }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 16px;
+  font-size: 15px; font-weight: bold; font-family: inherit;
+  border-radius: 8px; border: 1px solid transparent;
+  cursor: pointer; text-decoration: none;
+  background: var(--green); color: var(--white);
+  min-height: 44px;              /* comfortable finger size */
+}
+.btn:hover { background: var(--green-dark); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-block { width: 100%; }
+.btn-outline { background: var(--white); color: var(--green); border-color: var(--green); }
+.btn-outline:hover { background: var(--green-light); }
+.btn-purple { background: var(--purple); }
+.btn-purple:hover { background: #3f379a; }
+.btn-danger { background: var(--red); }
+.btn-danger:hover { background: #7f1f1f; }
+.btn-amber { background: var(--amber); }
+.btn-amber:hover { background: #8a5200; }
+.btn-small { padding: 7px 11px; font-size: 14px; min-height: 36px; }
+
+/* ---------- Messages, badges ---------- */
+.alert { padding: 12px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; }
+.alert-error { background: var(--red-light); color: var(--red); }
+.alert-ok    { background: var(--green-light); color: var(--green-dark); }
+.alert-info  { background: var(--purple-light); color: var(--purple); }
+.alert-warn  { background: var(--amber-light); color: var(--amber); }
+
+.badge {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: bold; text-transform: capitalize;
+  background: var(--green-light); color: var(--green-dark);
+}
+.badge-scheduled { background: var(--purple-light); color: var(--purple); }
+.badge-active    { background: var(--green-light);  color: var(--green-dark); }
+.badge-delayed   { background: var(--amber-light);  color: var(--amber); }
+.badge-completed { background: #ECEFF1; color: var(--muted); }
+.badge-cancelled { background: var(--red-light);    color: var(--red); }
+.badge-booked    { background: var(--green-light);  color: var(--green-dark); }
+.badge-walk_on   { background: var(--purple-light); color: var(--purple); }
+
+.empty { text-align: center; color: var(--muted); padding: 24px 10px; }
+
+/* ---------- Tables (scroll sideways on phones) ---------- */
+.table-wrap { width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: var(--white); font-size: 14px; }
+th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { background: var(--green-light); color: var(--green-dark); white-space: nowrap; }
+tr.warn td { background: var(--amber-light); }
+
+/* ---------- Tabs ---------- */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.tab {
+  padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--white); cursor: pointer; font-size: 15px; font-family: inherit; color: var(--text);
+}
+.tab.active { background: var(--green); color: var(--white); border-color: var(--green); }
+
+/* ---------- Map ---------- */
+.map { width: 100%; height: 60vh; min-height: 320px; border-radius: var(--radius); border: 1px solid var(--border); z-index: 0; }
+.map-small { height: 320px; }
+.bus-marker {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--green); color: var(--white); border: 3px solid var(--white);
+  box-shadow: 0 1px 6px rgba(0,0,0,.35);
+  display: grid; place-items: center; font-size: 17px;
+}
+.bus-marker.delayed { background: var(--amber); }
+.stop-marker {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--white); border: 3px solid var(--purple);
+}
+.leaflet-popup-content { font-size: 14px; line-height: 1.4; }
+.eta-list { margin: 6px 0 0; padding-left: 18px; }
+
+/* ---------- Toast and confirm box (no alert()/confirm(): WebView friendly) ---------- */
+#bb-toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 8px;
+  background: var(--text); color: var(--white); font-size: 15px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25); z-index: 3000;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+#bb-toast.show { opacity: 1; }
+#bb-toast.error { background: var(--red); }
+#bb-toast.ok { background: var(--green-dark); }
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display: grid; place-items: center; z-index: 2500; padding: 16px;
+}
+.modal { background: var(--white); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 380px; }
+.modal .row { justify-content: flex-end; margin-top: 16px; }
+
+/* ---------- Chat ---------- */
+.chat { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg);
+        border: 1px solid var(--border); border-radius: var(--radius); height: 50vh; min-height: 280px; overflow-y: auto; }
+.bubble { max-width: 78%; padding: 9px 12px; border-radius: 14px; font-size: 15px; word-wrap: break-word; }
+.bubble.mine   { align-self: flex-end; background: var(--green); color: var(--white); border-bottom-right-radius: 4px; }
+.bubble.theirs { align-self: flex-start; background: var(--white); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.bubble .time { display: block; font-size: 11px; opacity: .75; margin-top: 3px; }
+
+/* ---------- Demo mode bar ---------- */
+.demo-bar { background: var(--purple-light); color: var(--purple); font-size: 13px; text-align: center; padding: 6px 12px; line-height: 1.6; }
+.demo-bar button { background: none; border: none; color: var(--purple); text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; font-family: inherit; }
+
+/* ---------- Footer ---------- */
+footer.site-footer { text-align: center; color: var(--muted); font-size: 13px; padding: 18px 16px; }

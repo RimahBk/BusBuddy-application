@@ -1,0 +1,6 @@
+In app/build.gradle.kts, inside dependencies { ... } add:
+
+    implementation("androidx.webkit:webkit:1.18.0")
+
+(If your file is app/build.gradle without .kts, write:  implementation "androidx.webkit:webkit:1.18.0")
+Then press "Sync Now" at the top of the editor.

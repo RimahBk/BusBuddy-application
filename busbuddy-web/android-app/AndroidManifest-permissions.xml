@@ -1,0 +1,4 @@
+<!-- Paste these 3 lines in app/src/main/AndroidManifest.xml, inside <manifest>, ABOVE <application> -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

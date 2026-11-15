@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage system – BusBuddy</title>
+  <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/vendor/supabase.js"></script>
+  <script src="js/vendor/leaflet/leaflet.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-data.js"></script>
+  <script src="js/app.js"></script>
+  <style>
+    .panel { margin-top: 4px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 14px; }
+    .panel td { white-space: nowrap; }
+    .actions .btn + .btn { margin-left: 6px; }
+    td .lic { margin-top: 6px; min-width: 150px; }
+    td select { min-width: 130px; padding: 8px; }
+    .num-tip { background: var(--purple); color: #fff; border: none; font-weight: bold; padding: 1px 6px; }
+    .num-tip::before { display: none; }
+    #route-map { height: 45vh; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <header id="topbar"></header>
+  <main class="container">
+    <h1>Manage system</h1>
+    <div class="tabs" role="tablist">
+      <button class="tab" data-tab="buses">Buses</button>
+      <button class="tab" data-tab="routes">Routes &amp; stops</button>
+      <button class="tab" data-tab="trips">Trips</button>
+      <button class="tab" data-tab="accounts">Accounts</button>
+    </div>
+
+    <!-- ===== a) BUSES ===== -->
+    <section class="panel hidden" id="panel-buses">
+      <form class="card" id="bus-form">
+        <div class="card-title" id="bus-form-title">Add bus</div>
+        <input type="hidden" id="bus-id">
+        <div class="form-grid">
+          <div class="field"><label for="bus-plate">Plate number</label><input id="bus-plate" required placeholder="G 123456"></div>
+          <div class="field"><label for="bus-cap">Capacity (seats)</label><input id="bus-cap" type="number" min="1" max="60" required></div>
+          <div class="field"><label for="bus-owner">Owner driver</label><select id="bus-owner"></select></div>
+        </div>
+        <div class="row"><button class="btn" id="bus-save">Save bus</button><button type="button" class="btn btn-outline hidden" id="bus-cancel">Cancel edit</button></div>
+      </form>
+      <div class="card"><div class="card-title">All buses</div><div id="bus-list"></div></div>
+    </section>
+
+    <!-- ===== b) ROUTES & STOPS ===== -->
+    <section class="panel hidden" id="panel-routes">
+      <div class="card">
+        <div class="row">
+          <div class="field" style="flex:1;min-width:200px;margin:0"><label for="route-select">Route</label><select id="route-select"></select></div>
+          <button class="btn btn-outline" id="route-new-btn" style="align-self:flex-end">New route</button>
+        </div>
+        <form id="route-form" class="hidden" style="margin-top:14px">
+          <div class="form-grid">
+            <div class="field"><label for="route-name">Name</label><input id="route-name" required placeholder="Chouf – LIU Cola"></div>
+            <div class="field"><label for="route-origin">Origin</label><input id="route-origin" required></div>
+            <div class="field"><label for="route-dest">Destination</label><input id="route-dest" required></div>
+          </div>
+          <button class="btn">Create route</button>
+        </form>
+      </div>
+      <div class="card">
+        <div id="route-map" class="map"></div>
+        <p class="muted">Click the map to place a stop.</p>
+        <form id="stop-form">
+          <div class="card-title" id="stop-form-title">Add stop</div>
+          <input type="hidden" id="stop-id">
+          <div class="form-grid">
+            <div class="field"><label for="stop-address">Address</label><input id="stop-address" required></div>
+            <div class="field"><label for="stop-lat">Latitude</label><input id="stop-lat" type="number" step="any" required></div>
+            <div class="field"><label for="stop-lng">Longitude</label><input id="stop-lng" type="number" step="any" required></div>
+            <div class="field"><label for="stop-order">Stop order</label><input id="stop-order" type="number" min="1" required></div>
+            <div class="field"><label for="stop-min">Minutes from start</label><input id="stop-min" type="number" min="0" value="0" required></div>
+          </div>
+          <div class="row"><button class="btn" id="stop-save">Save stop</button><button type="button" class="btn btn-outline hidden" id="stop-cancel">Cancel edit</button></div>
+        </form>
+      </div>
+      <div class="card"><div class="card-title">Stops of this route</div><div id="stop-list"></div></div>
+    </section>
+
+    <!-- ===== c) TRIPS ===== -->
+    <section class="panel hidden" id="panel-trips">
+      <form class="card" id="trip-form">
+        <div class="card-title">Create trip</div>
+        <div class="form-grid">
+          <div class="field"><label for="trip-route">Route</label><select id="trip-route" required></select></div>
+          <div class="field"><label for="trip-bus">Bus</label><select id="trip-bus" required></select></div>
+          <div class="field"><label for="trip-driver">Driver</label><select id="trip-driver" required></select></div>
+          <div class="field"><label for="trip-dep">Departure</label><input id="trip-dep" type="datetime-local" required></div>
+        </div>
+        <button class="btn" id="trip-save">Create trip</button>
+      </form>
+      <div class="card"><div class="card-title">Upcoming and running trips</div><div id="trip-list"></div></div>
+    </section>
+
+    <!-- ===== d) ACCOUNTS ===== -->
+    <section class="panel hidden" id="panel-accounts">
+      <form class="card" id="driver-form">
+        <div class="card-title">Create driver account</div>
+        <div id="driver-msg" class="hidden"></div>
+        <div class="form-grid">
+          <div class="field"><label for="dr-name">Full name</label><input id="dr-name" required></div>
+          <div class="field"><label for="dr-email">Email</label><input id="dr-email" type="email" required></div>
+          <div class="field"><label for="dr-phone">Phone</label><input id="dr-phone" type="tel" placeholder="+96170123456" required></div>
+          <div class="field"><label for="dr-pass">Temporary password</label><input id="dr-pass" type="text" minlength="8" required></div>
+          <div class="field"><label for="dr-lic">Licence number</label><input id="dr-lic" required></div>
+        </div>
+        <button class="btn" id="dr-save">Create driver</button>
+      </form>
+      <div class="card">
+        <div class="row-between"><div class="card-title">All accounts</div><input id="acc-search" type="search" placeholder="Search name, email or phone" style="max-width:320px"></div>
+        <div id="acc-note" class="hidden"></div>
+        <div id="acc-list" style="margin-top:10px"></div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer">BusBuddy · LIU senior project</footer>
+
+  <script>
+    BB.ready(async () => {
+      await BB.renderNav("admin.html");
+      if (!BB.db) return;                                   // setup not done yet
+      const me = await BB.requireRole(["admin"]);           // administrators only (UC-18)
+      if (!me) return;
+      const db = BB.db, $ = BB.$, esc = BB.esc;
+
+      // ---------------------------------------------------------------
+      // 0. Shared data (users, drivers, buses, routes) and small helpers
+      // ---------------------------------------------------------------
+      const D = { users: [], drivers: [], buses: [], routes: [] };
+      async function loadBase() {
+        const res = await Promise.all([
+          db.from("users").select("*").order("full_name"),
+          db.from("drivers").select("*"),
+          db.from("buses").select("*").order("plate_number"),
+          db.from("routes").select("*").order("route_id")
+        ]);
+        const err = res.find((r) => r.error);
+        if (err) { BB.toast(BB.errText(err.error), "error"); return; }
+        [D.users, D.drivers, D.buses, D.routes] = res.map((r) => r.data || []);
+      }
+      const userName = (id) => (D.users.find((u) => u.user_id === id) || {}).full_name || "–";
+      const routeName = (id) => (D.routes.find((r) => r.route_id === id) || {}).name || "–";
+      const busPlate = (id) => (D.buses.find((b) => b.bus_id === id) || {}).plate_number || "–";
+      const options = (list, placeholder) => (placeholder ? `<option value="">${placeholder}</option>` : "") +
+        list.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+
+      // Turn a Postgres error into a sentence the admin understands
+      function dbErr(error, what) {
+        const m = error.message || "", c = error.code;
+        if (c === "23505" || /duplicate key/i.test(m)) {
+          if (/owner/i.test(m)) return "This driver already owns a bus.";
+          if (what === "bus") return "A bus with this plate already exists.";
+          if (what === "stop") return "Another stop on this route already has this order number.";
+          return "This value already exists.";
+        }
+        if (c === "23503" || /foreign key/i.test(m)) {
+          if (what === "bus") return "This bus is used by trips. Cancel or reassign them first.";
+          return "This item is still used elsewhere.";
+        }
+        if (c === "23514" || /check constraint/i.test(m)) return "A value is outside the allowed range.";
+        return BB.errText(error);
+      }
+
+      // ---------------------------------------------------------------
+      // 1. Tabs – the open tab is remembered in the address (#buses, #routes, …)
+      // ---------------------------------------------------------------
+      const TABS = ["buses", "routes", "trips", "accounts"];
+      const loaders = {};                                   // tab → function that (re)draws it
+      async function openTab(name) {
+        if (!TABS.includes(name)) name = "buses";
+        BB.$$(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+        TABS.forEach((t) => $("#panel-" + t).classList.toggle("hidden", t !== name));
+        if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+        await loaders[name]();
+      }
+      BB.$$(".tab").forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
+      window.addEventListener("hashchange", () => openTab(location.hash.slice(1)));
+
+      // ---------------------------------------------------------------
+      // 2. BUSES – list, add, edit, delete
+      // ---------------------------------------------------------------
+      loaders.buses = async () => {
+        await loadBase();
+        const list = $("#bus-list");
+        list.innerHTML = !D.buses.length ? '<div class="empty">No buses yet.</div>' :
+          `<div class="table-wrap"><table><thead><tr><th>Plate</th><th>Capacity</th><th>Owner driver</th><th></th></tr></thead><tbody>
+          ${D.buses.map((b) => `<tr><td>${esc(b.plate_number)}</td><td>${b.capacity}</td><td>${b.owner_id ? esc(userName(b.owner_id)) : '<span class="muted">No owner</span>'}</td>
+            <td class="actions"><button class="btn btn-outline btn-small" data-edit-bus="${b.bus_id}">Edit</button><button class="btn btn-danger btn-small" data-del-bus="${b.bus_id}">Delete</button></td></tr>`).join("")}
+          </tbody></table></div>`;
+        resetBusForm();
+      };
+      // Owner list = drivers without a bus (plus the current owner when editing)
+      function fillOwnerSelect(currentOwner) {
+        const owned = D.buses.map((b) => b.owner_id).filter(Boolean);
+        const free = D.drivers.filter((d) => !owned.includes(d.user_id) || d.user_id === currentOwner);
+        $("#bus-owner").innerHTML = options(free.map((d) => [d.user_id, userName(d.user_id)]), "No owner");
+        $("#bus-owner").value = currentOwner || "";
+      }
+      function resetBusForm() {
+        $("#bus-form").reset(); $("#bus-id").value = "";
+        $("#bus-form-title").textContent = "Add bus"; $("#bus-cancel").classList.add("hidden");
+        fillOwnerSelect(null);
+      }
+      $("#bus-cancel").addEventListener("click", resetBusForm);
+      $("#bus-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const row = { plate_number: $("#bus-plate").value.trim().toUpperCase(), capacity: Number($("#bus-cap").value), owner_id: $("#bus-owner").value || null };
+        if (!row.plate_number) return BB.toast("Enter the plate number.", "error");
+        if (!Number.isInteger(row.capacity) || row.capacity < 1 || row.capacity > 60) return BB.toast("Capacity must be between 1 and 60.", "error");
+        const id = $("#bus-id").value;
+        BB.busy($("#bus-save"), true, "Saving…");
+        const { error } = id ? await db.from("buses").update(row).eq("bus_id", Number(id)) : await db.from("buses").insert(row);
+        BB.busy($("#bus-save"), false);
+        if (error) return BB.toast(dbErr(error, "bus"), "error");
+        BB.toast(id ? "Bus updated." : "Bus added.", "ok");
+        await loaders.buses();
+      });
+      $("#bus-list").addEventListener("click", async (e) => {
+        const ed = e.target.closest("[data-edit-bus]"), del = e.target.closest("[data-del-bus]");
+        if (ed) {
+          const b = D.buses.find((x) => String(x.bus_id) === ed.dataset.editBus);
+          $("#bus-id").value = b.bus_id; $("#bus-plate").value = b.plate_number; $("#bus-cap").value = b.capacity;
+          fillOwnerSelect(b.owner_id);
+          $("#bus-form-title").textContent = "Edit bus " + b.plate_number; $("#bus-cancel").classList.remove("hidden");
+          $("#bus-form").scrollIntoView({ behavior: "smooth" });
+        }
+        if (del) {
+          if (!(await BB.confirmBox("Delete this bus? This cannot be undone.", "Delete"))) return;
+          const { error } = await db.from("buses").delete().eq("bus_id", Number(del.dataset.delBus));
+          if (error) return BB.toast(dbErr(error, "bus"), "error");
+          BB.toast("Bus deleted.", "ok");
+          await loaders.buses();
+        }
+      });
+
+      // ---------------------------------------------------------------
+      // 3. ROUTES & STOPS – pick a route, click the map to place stops
+      // ---------------------------------------------------------------
+      let map, stopLayer, tempMarker, stops = [];
+      loaders.routes = async () => {
+        await loadBase();
+        if (!map) {                                          // create the map the first time the tab opens
+          map = BB.makeMap("route-map");
+          stopLayer = L.layerGroup().addTo(map);
+          map.on("click", (e) => placeTemp(e.latlng.lat, e.latlng.lng, true));
+        }
+        setTimeout(() => map.invalidateSize(), 50);          // the map was hidden, so let Leaflet re-measure it
+        const sel = $("#route-select"), keep = sel.value;
+        sel.innerHTML = D.routes.length ? options(D.routes.map((r) => [r.route_id, r.name])) : '<option value="">No routes yet – create one</option>';
+        if (keep && D.routes.some((r) => String(r.route_id) === keep)) sel.value = keep;
+        await loadStops();
+      };
+      // Show a red circle where the new stop will go; optionally copy the position into the form
+      function placeTemp(lat, lng, fill) {
+        if (tempMarker) map.removeLayer(tempMarker);
+        tempMarker = L.circleMarker([lat, lng], { radius: 9, color: "#A32D2D", weight: 3, fillOpacity: 0.4 }).addTo(map);
+        if (fill) { $("#stop-lat").value = lat.toFixed(6); $("#stop-lng").value = lng.toFixed(6); }
+      }
+      async function loadStops() {
+        const routeId = Number($("#route-select").value);
+        stops = [];
+        if (routeId) {
+          const { data, error } = await db.from("stops").select("*").eq("route_id", routeId).order("stop_order");
+          if (error) return BB.toast(BB.errText(error), "error");
+          stops = data || [];
+        }
+        // Draw numbered stops and the line between them
+        stopLayer.clearLayers();
+        const line = stops.map((s) => [s.latitude, s.longitude]);
+        if (line.length > 1) L.polyline(line, { color: "#534AB7", weight: 4, opacity: 0.6 }).addTo(stopLayer);
+        stops.forEach((s) => L.marker([s.latitude, s.longitude], { icon: BB.stopIcon() }).addTo(stopLayer)
+          .bindTooltip(String(s.stop_order), { permanent: true, direction: "top", offset: [0, -6], className: "num-tip" })
+          .bindPopup(`${s.stop_order}. ${esc(s.address)}<br>${s.minutes_from_start} min from start`));
+        if (line.length) map.fitBounds(line, { padding: [30, 30], maxZoom: 14 });
+        // Table of stops
+        $("#stop-list").innerHTML = !routeId ? '<div class="empty">Create a route first.</div>' : !stops.length ? '<div class="empty">This route has no stops yet.</div>' :
+          `<div class="table-wrap"><table><thead><tr><th>#</th><th>Address</th><th>Position</th><th>Minutes</th><th></th></tr></thead><tbody>
+          ${stops.map((s) => `<tr><td>${s.stop_order}</td><td>${esc(s.address)}</td><td class="muted">${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}</td><td>${s.minutes_from_start}</td>
+            <td class="actions"><button class="btn btn-outline btn-small" data-edit-stop="${s.stop_id}">Edit</button><button class="btn btn-danger btn-small" data-del-stop="${s.stop_id}">Delete</button></td></tr>`).join("")}
+          </tbody></table></div>`;
+        resetStopForm();
+      }
+      function resetStopForm() {
+        $("#stop-form").reset(); $("#stop-id").value = "";
+        $("#stop-order").value = stops.length ? stops[stops.length - 1].stop_order + 1 : 1;   // default = last + 1
+        $("#stop-form-title").textContent = "Add stop"; $("#stop-cancel").classList.add("hidden");
+        if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+      }
+      $("#route-select").addEventListener("change", loadStops);
+      $("#stop-cancel").addEventListener("click", resetStopForm);
+      $("#route-new-btn").addEventListener("click", () => $("#route-form").classList.toggle("hidden"));
+      $("#route-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const row = { name: $("#route-name").value.trim(), origin: $("#route-origin").value.trim(), destination: $("#route-dest").value.trim() };
+        if (!row.name || !row.origin || !row.destination) return BB.toast("Fill in name, origin and destination.", "error");
+        const { data, error } = await db.from("routes").insert(row).select().single();
+        if (error) return BB.toast(dbErr(error, "route"), "error");
+        BB.toast("Route created. Now click the map to add its stops.", "ok");
+        $("#route-form").reset(); $("#route-form").classList.add("hidden");
+        $("#route-select").value = "";
+        await loaders.routes();
+        $("#route-select").value = data.route_id; await loadStops();
+      });
+      $("#stop-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const routeId = Number($("#route-select").value);
+        if (!routeId) return BB.toast("Create or choose a route first.", "error");
+        const row = { route_id: routeId, address: $("#stop-address").value.trim(), latitude: Number($("#stop-lat").value), longitude: Number($("#stop-lng").value),
+                      stop_order: Number($("#stop-order").value), minutes_from_start: Number($("#stop-min").value) };
+        if (!row.address) return BB.toast("Enter the stop's address.", "error");
+        if (!$("#stop-lat").value || Math.abs(row.latitude) > 90 || Math.abs(row.longitude) > 180) return BB.toast("Click the map to set the position.", "error");
+        if (!Number.isInteger(row.stop_order) || row.stop_order < 1 || row.minutes_from_start < 0) return BB.toast("Check the order and minutes.", "error");
+        const id = $("#stop-id").value;
+        BB.busy($("#stop-save"), true, "Saving…");
+        const { error } = id ? await db.from("stops").update(row).eq("stop_id", Number(id)) : await db.from("stops").insert(row);
+        BB.busy($("#stop-save"), false);
+        if (error) return BB.toast(dbErr(error, "stop"), "error");
+        BB.toast(id ? "Stop updated." : "Stop added.", "ok");
+        await loadStops();
+      });
+      $("#stop-list").addEventListener("click", async (e) => {
+        const ed = e.target.closest("[data-edit-stop]"), del = e.target.closest("[data-del-stop]");
+        if (ed) {
+          const s = stops.find((x) => String(x.stop_id) === ed.dataset.editStop);
+          $("#stop-id").value = s.stop_id; $("#stop-address").value = s.address; $("#stop-lat").value = s.latitude; $("#stop-lng").value = s.longitude;
+          $("#stop-order").value = s.stop_order; $("#stop-min").value = s.minutes_from_start;
+          $("#stop-form-title").textContent = "Edit stop " + s.stop_order; $("#stop-cancel").classList.remove("hidden");
+          placeTemp(s.latitude, s.longitude, false); map.setView([s.latitude, s.longitude], 14);
+          $("#route-map").scrollIntoView({ behavior: "smooth" });
+        }
+        if (del) {
+          if (!(await BB.confirmBox("Delete this stop?", "Delete"))) return;
+          const { error } = await db.from("stops").delete().eq("stop_id", Number(del.dataset.delStop));
+          if (error) return BB.toast(dbErr(error, "stop"), "error");
+          BB.toast("Stop deleted.", "ok");
+          await loadStops();
+        }
+      });
+
+      // ---------------------------------------------------------------
+      // 4. TRIPS – create a trip, list upcoming/running ones, cancel
+      // ---------------------------------------------------------------
+      let trips = [];
+      loaders.trips = async () => {
+        await loadBase();
+        $("#trip-route").innerHTML = options(D.routes.map((r) => [r.route_id, r.name]), "Choose a route");
+        $("#trip-bus").innerHTML = options(D.buses.map((b) => [b.bus_id, `${b.plate_number} (${b.capacity} seats)`]), "Choose a bus");
+        $("#trip-driver").innerHTML = options(D.drivers.map((d) => [d.user_id, userName(d.user_id)]), "Choose a driver");
+        const [t, s] = await Promise.all([
+          db.from("trips").select("*").in("status", ["scheduled", "active", "delayed"]).order("departure_time"),
+          db.rpc("get_upcoming_trips")                      // gives the free seats of each trip
+        ]);
+        if (t.error) return BB.toast(BB.errText(t.error), "error");
+        trips = t.data || [];
+        const seats = {}; (s.data || []).forEach((x) => { seats[x.trip_id] = x; });
+        $("#trip-list").innerHTML = !trips.length ? '<div class="empty">No upcoming trips.</div>' :
+          `<div class="table-wrap"><table><thead><tr><th>Departure</th><th>Route</th><th>Bus</th><th>Driver</th><th>Status</th><th>Seats taken</th><th></th></tr></thead><tbody>
+          ${trips.map((x) => { const k = seats[x.trip_id]; return `<tr><td>${BB.fmtDateTime(x.departure_time)}</td><td>${esc(routeName(x.route_id))}</td>
+            <td>${esc(busPlate(x.bus_id))}</td><td>${esc(userName(x.driver_id))}</td><td>${BB.badge(x.status)}</td>
+            <td>${k ? (k.capacity - k.available_seats) + " / " + k.capacity : "–"}</td>
+            <td>${x.status === "scheduled" ? `<button class="btn btn-danger btn-small" data-cancel-trip="${x.trip_id}">Cancel trip</button>` : ""}</td></tr>`; }).join("")}
+          </tbody></table></div>`;
+      };
+      // Choosing a bus pre-selects its owner as the driver
+      $("#trip-bus").addEventListener("change", () => {
+        const b = D.buses.find((x) => String(x.bus_id) === $("#trip-bus").value);
+        if (b && b.owner_id) $("#trip-driver").value = b.owner_id;
+      });
+      $("#trip-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const dep = $("#trip-dep").value;
+        if (!$("#trip-route").value || !$("#trip-bus").value || !$("#trip-driver").value || !dep) return BB.toast("Fill in every field.", "error");
+        if (new Date(dep) <= new Date()) return BB.toast("The departure must be in the future.", "error");
+        const row = { route_id: Number($("#trip-route").value), bus_id: Number($("#trip-bus").value), driver_id: $("#trip-driver").value,
+                      departure_time: new Date(dep).toISOString() };    // datetime-local is local time → ISO (UTC)
+        BB.busy($("#trip-save"), true, "Creating…");
+        const { error } = await db.from("trips").insert(row);           // status defaults to "scheduled"
+        BB.busy($("#trip-save"), false);
+        if (error) return BB.toast(dbErr(error, "trip"), "error");
+        BB.toast("Trip created.", "ok");
+        $("#trip-form").reset();
+        await loaders.trips();
+      });
+      $("#trip-list").addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-cancel-trip]");
+        if (!b) return;
+        if (!(await BB.confirmBox("Cancel this trip? All seat reservations on it will be cancelled too.", "Cancel trip"))) return;
+        const { error } = await db.rpc("admin_cancel_trip", { p_trip_id: Number(b.dataset.cancelTrip) });
+        if (error) return BB.toast(BB.errText(error), "error");
+        BB.toast("Trip and its bookings cancelled.", "ok");
+        await loaders.trips();
+      });
+
+      // ---------------------------------------------------------------
+      // 5. ACCOUNTS – roles, create driver, activate / deactivate
+      // ---------------------------------------------------------------
+      // Calls our Vercel server function api/admin.js (it holds the secret key, the browser never does)
+      async function callApi(body) {
+        const { data } = await db.auth.getSession();
+        try {
+          const res = await fetch("api/admin", { method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + (data.session ? data.session.access_token : "") },
+            body: JSON.stringify(body) });
+          const json = await res.json().catch(() => null);
+          if (!json) return { unreachable: true, error: "The admin server function is not reachable. Deploy to Vercel (see README) to create driver accounts." };
+          return res.ok ? json : { error: json.error || "Request failed." };
+        } catch (err) {
+          return { unreachable: true, error: "The admin server function is not reachable. Deploy to Vercel (see README) to create driver accounts." };
+        }
+      }
+
+      let banned = null;                                    // user_id → true when deactivated (null = unknown)
+      loaders.accounts = async () => {
+        await loadBase();
+        const st = await callApi({ action: "list_status" });
+        banned = st.banned || null;
+        BB.show("#acc-note", banned ? "" : "Account status (active / deactivated) is unknown because the admin server function is not reachable.", "warn");
+        const lic = (id) => (D.drivers.find((d) => d.user_id === id) || {}).license_number || "";
+        $("#acc-list").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Type</th><th>Change role</th><th>Access</th></tr></thead><tbody>
+          ${D.users.map((u) => { const self = u.user_id === me.id; return `<tr data-user="${esc(u.user_id)}" data-search="${esc((u.full_name + " " + u.email + " " + (u.phone_no || "")).toLowerCase())}">
+            <td>${esc(u.full_name)}${self ? ' <span class="muted">(you)</span>' : ""}${banned && banned[u.user_id] ? ' <span class="badge badge-cancelled">deactivated</span>' : ""}</td>
+            <td>${esc(u.email)}</td><td>${esc(u.phone_no || "–")}</td><td>${BB.badge(u.type)}</td>
+            <td>${self ? '<span class="muted">You cannot change your own role.</span>' : `<div class="row" style="flex-wrap:nowrap">
+                <select data-role>${["passenger", "driver", "admin"].map((t) => `<option ${t === u.type ? "selected" : ""}>${t}</option>`).join("")}</select>
+                <button class="btn btn-small" data-save-role>Save</button></div>
+              <input class="lic ${u.type === "driver" ? "" : "hidden"}" data-lic placeholder="Licence number" value="${esc(lic(u.user_id))}">`}</td>
+            <td>${self ? "" : !banned ? '<button class="btn btn-outline btn-small" data-active="false">Deactivate</button> <button class="btn btn-outline btn-small" data-active="true">Activate</button>'
+              : banned[u.user_id] ? '<button class="btn btn-small" data-active="true">Activate</button>' : '<button class="btn btn-outline btn-small" data-active="false">Deactivate</button>'}</td>
+          </tr>`; }).join("")}</tbody></table></div>`;
+        filterAccounts();
+      };
+      // Search box filters the rows already on the page
+      function filterAccounts() {
+        const q = $("#acc-search").value.trim().toLowerCase();
+        BB.$$("#acc-list tr[data-user]").forEach((tr) => tr.classList.toggle("hidden", !!q && !tr.dataset.search.includes(q)));
+      }
+      $("#acc-search").addEventListener("input", filterAccounts);
+      // Choosing "driver" shows the licence box
+      $("#acc-list").addEventListener("change", (e) => {
+        if (!e.target.matches("[data-role]")) return;
+        $("[data-lic]", e.target.closest("tr")).classList.toggle("hidden", e.target.value !== "driver");
+      });
+      $("#acc-list").addEventListener("click", async (e) => {
+        const tr = e.target.closest("tr[data-user]");
+        if (!tr) return;
+        const userId = tr.dataset.user, u = D.users.find((x) => x.user_id === userId);
+        // Save a role change
+        if (e.target.matches("[data-save-role]")) {
+          const type = $("[data-role]", tr).value, licence = $("[data-lic]", tr).value.trim();
+          if (userId === me.id && type !== "admin") return BB.toast("You cannot remove your own admin role.", "error");
+          if (type === "driver" && !licence) { $("[data-lic]", tr).focus(); return BB.toast("Enter the licence number for a driver.", "error"); }
+          BB.busy(e.target, true, "…");
+          const { error } = await db.rpc("admin_set_role", { p_user_id: userId, p_type: type, p_license: type === "driver" ? licence : null });
+          BB.busy(e.target, false);
+          if (error) return BB.toast(BB.errText(error), "error");
+          BB.toast(`${u.full_name} is now ${type === "admin" ? "an" : "a"} ${type}.`, "ok");
+          await loaders.accounts();
+        }
+        // Activate / deactivate the login
+        const act = e.target.closest("[data-active]");
+        if (act) {
+          const active = act.dataset.active === "true";
+          if (!(await BB.confirmBox(active ? `Allow ${u.full_name} to log in again?` : `Deactivate ${u.full_name}? They will not be able to log in.`, active ? "Activate" : "Deactivate"))) return;
+          const res = await callApi({ action: "set_active", user_id: userId, active });
+          if (res.error) return BB.toast(res.error, "error");
+          BB.toast(active ? "Account activated." : "Account deactivated.", "ok");
+          await loaders.accounts();
+        }
+      });
+      // Create a driver account (needs the server function: only it may create logins for others)
+      $("#driver-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const body = { action: "create_driver", full_name: $("#dr-name").value.trim(), email: $("#dr-email").value.trim(),
+                       phone_no: $("#dr-phone").value.replace(/\s/g, ""), password: $("#dr-pass").value, license_number: $("#dr-lic").value.trim() };
+        if (!/^\+961\d{7,8}$/.test(body.phone_no)) return BB.show("#driver-msg", "Phone must look like +96170123456.", "error");
+        if (body.password.length < 8) return BB.show("#driver-msg", "The temporary password needs at least 8 characters.", "error");
+        BB.busy($("#dr-save"), true, "Creating…");
+        const res = await callApi(body);
+        BB.busy($("#dr-save"), false);
+        if (res.error) return BB.show("#driver-msg", res.error, res.unreachable ? "warn" : "error");
+        BB.show("#driver-msg", `Driver account created for ${body.email}. Give them the temporary password.`, "ok");
+        $("#driver-form").reset();
+        await loaders.accounts();
+      });
+
+      // ---------------------------------------------------------------
+      // 6. Start on the tab named in the address, or Buses
+      // ---------------------------------------------------------------
+      await openTab(location.hash.slice(1) || "buses");
+    });
+  </script>
+</body>
+</html>

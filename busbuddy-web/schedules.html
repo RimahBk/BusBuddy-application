@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedules – BusBuddy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-data.js"></script>
+  <script src="js/app.js"></script>
+  <style>
+    /* Route timeline: a circle for each stop joined by a vertical line */
+    .timeline { list-style: none; margin: 0; padding: 0; }
+    .timeline li { position: relative; padding: 0 0 18px 28px; }
+    .timeline li::before { content: ""; position: absolute; left: 0; top: 3px; width: 14px; height: 14px;
+                           border-radius: 50%; background: var(--white); border: 3px solid var(--purple); box-sizing: border-box; }
+    .timeline li::after { content: ""; position: absolute; left: 6px; top: 17px; bottom: 0; width: 2px; background: var(--purple-light); }
+    .timeline li:last-child { padding-bottom: 0; }
+    .timeline li:last-child::after { display: none; }
+    .sched-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; align-items: start; }
+    @media (max-width: 820px) { .sched-layout { grid-template-columns: 1fr; } }
+    .trip-card.highlight { outline: 3px solid var(--amber); }
+    .trip-card select { width: auto; min-width: 90px; }
+    .full { color: var(--red); font-weight: bold; }
+    .stop-times { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
+    .trip-msg .alert { margin: 12px 0 0; }
+  </style>
+</head>
+<body>
+  <header id="topbar"></header>
+  <main class="container">
+    <h1>Schedules</h1>
+    <div id="route-pick" class="field hidden">
+      <label for="route-select">Route</label>
+      <select id="route-select"></select>
+    </div>
+    <p id="route-info" class="muted"></p>
+
+    <div class="sched-layout">
+      <section class="card">
+        <h2>Route timeline</h2>
+        <ol id="timeline" class="timeline"><li class="muted">Loading…</li></ol>
+      </section>
+      <section>
+        <h2>Upcoming trips</h2>
+        <p id="role-note" class="muted hidden">Only passengers can reserve seats.</p>
+        <div id="book-result" class="hidden"></div>
+        <div id="trips"><p class="muted">Loading…</p></div>
+      </section>
+    </div>
+  </main>
+  <footer class="site-footer">BusBuddy · LIU senior project</footer>
+
+  <script>
+    BB.ready(async () => {
+      await BB.renderNav("schedules.html");
+      if (!BB.db) { BB.$(".sched-layout").classList.add("hidden"); return; }   // setup not done yet: the banner explains
+
+      // ---------------------------------------------------------------
+      // 1. Who is looking? Guests and passengers see Reserve buttons
+      //    (guests are sent to log in); drivers and admins do not.
+      // ---------------------------------------------------------------
+      const user = await BB.getUser();
+      const canBook = !user || user.type === "passenger";
+      if (!canBook) BB.$("#role-note").classList.remove("hidden");
+
+      // ---------------------------------------------------------------
+      // 2. Load the routes and all stops (stops are grouped by route)
+      // ---------------------------------------------------------------
+      const { data: routes, error } = await BB.db.from("routes").select("*").order("route_id");
+      if (error) { BB.toast(BB.errText(error), "error"); return; }
+      if (!routes || !routes.length) {
+        BB.$("#timeline").innerHTML = "";
+        BB.$("#trips").innerHTML = `<div class="card empty">No routes have been added yet.</div>`;
+        return;
+      }
+      let stopsByRoute = {};
+      try { stopsByRoute = await BB.loadStopsByRoute(); } catch (e) { BB.toast(BB.errText(e), "error"); }
+
+      // Route chooser: only shown when there is more than one route (?route=<id> picks one)
+      const sel = BB.$("#route-select");
+      sel.innerHTML = routes.map((r) => `<option value="${r.route_id}">${BB.esc(r.name)}</option>`).join("");
+      const wanted = routes.find((r) => String(r.route_id) === BB.param("route"));
+      let route = wanted || routes[0];
+      sel.value = route.route_id;
+      if (routes.length > 1) BB.$("#route-pick").classList.remove("hidden");
+      sel.addEventListener("change", () => {
+        route = routes.find((r) => String(r.route_id) === sel.value);
+        history.replaceState(null, "", "schedules.html?route=" + route.route_id);
+        BB.show("#book-result", "");
+        showRoute();
+      });
+
+      // ---------------------------------------------------------------
+      // 3. Route timeline: every stop in order with "+N min"
+      // ---------------------------------------------------------------
+      async function showRoute() {
+        BB.$("#route-info").textContent = `${route.name}: ${route.origin} → ${route.destination}`;
+        const stops = stopsByRoute[route.route_id] || [];
+        BB.$("#timeline").innerHTML = stops.length
+          ? stops.map((s) => `<li><b>${BB.esc(s.address)}</b><br><span class="muted">+${s.minutes_from_start} min</span></li>`).join("")
+          : `<li class="muted">No stops on this route yet.</li>`;
+        await loadTrips();
+      }
+
+      // ---------------------------------------------------------------
+      // 4. Upcoming trips of the chosen route, one card each
+      // ---------------------------------------------------------------
+      let trips = [];
+      async function loadTrips() {
+        const { data, error } = await BB.db.rpc("get_upcoming_trips", { p_route_id: route.route_id });
+        if (error) { BB.toast(BB.errText(error), "error"); return; }
+        trips = (data || []).sort((a, b) => new Date(a.departure_time) - new Date(b.departure_time));
+        const box = BB.$("#trips");
+        if (!trips.length) { box.innerHTML = `<div class="card empty">No upcoming trips on this route.</div>`; return; }
+        box.innerHTML = trips.map(tripCardHtml).join("");
+
+        // Buttons inside the cards
+        BB.$$("[data-reserve]", box).forEach((b) => b.addEventListener("click", () => {
+          const t = trips.find((x) => x.trip_id === Number(b.dataset.reserve));
+          const seats = Number(BB.$("#seats-" + t.trip_id).value);
+          reserve(t.trip_id, seats, t.departure_time, b);
+        }));
+        BB.$$("[data-findnext]", box).forEach((b) => b.addEventListener("click", () =>
+          showNext(Number(b.dataset.findnext), 1)));
+        BB.$$("[data-times]", box).forEach((b) => b.addEventListener("click", () => {
+          const list = BB.$("#times-" + b.dataset.times);
+          list.classList.toggle("hidden");
+          b.textContent = list.classList.contains("hidden") ? "Times at stops" : "Hide times";
+        }));
+      }
+
+      function tripCardHtml(t) {
+        const free = t.available_seats;
+        const stops = stopsByRoute[t.route_id] || [];
+        const dep = new Date(t.departure_time).getTime();
+        const times = stops.map((s) =>
+          `<li>${BB.esc(s.address)} – ${BB.fmtTime(new Date(dep + s.minutes_from_start * 60000).toISOString())}</li>`).join("");
+
+        // What the passenger can do on this trip
+        let action = "";
+        if (t.status !== "scheduled") {
+          action = `<a class="btn btn-outline btn-small" href="map.html?trip=${t.trip_id}">On the road – track it</a>`;
+        } else if (canBook && free > 0) {
+          const options = Array.from({ length: Math.min(4, free) }, (_, i) =>
+            `<option value="${i + 1}">${i + 1} seat${i ? "s" : ""}</option>`).join("");
+          action = `<select id="seats-${t.trip_id}" aria-label="Number of seats">${options}</select>
+                    <button class="btn" data-reserve="${t.trip_id}">Reserve</button>`;
+        } else if (canBook) {
+          action = `<button class="btn btn-amber" data-findnext="${t.trip_id}">Find the next bus</button>`;
+        }
+
+        return `<div class="card trip-card" id="trip-${t.trip_id}">
+            <div class="row-between">
+              <div class="card-title">${BB.fmtDate(t.departure_time)} · ${BB.fmtTime(t.departure_time)}</div>
+              ${BB.badge(t.status)}
+            </div>
+            <p class="muted">Bus ${BB.esc(t.plate_number)}</p>
+            <p class="${free === 0 ? "full" : ""}">${free} of ${t.capacity} seats free</p>
+            <div class="row">${action}
+              <button class="btn btn-outline btn-small" data-times="${t.trip_id}">Times at stops</button>
+            </div>
+            <ul id="times-${t.trip_id}" class="stop-times hidden">${times || "<li>No stops.</li>"}</ul>
+            <div class="trip-msg" id="msg-${t.trip_id}"></div>
+          </div>`;
+      }
+
+      // ---------------------------------------------------------------
+      // 5. Reserve seats (UC-08). Guests go to the login page first.
+      //    If the bus is full, offer the next bus with enough seats (UC-09).
+      // ---------------------------------------------------------------
+      async function reserve(tripId, seats, departure, btn) {
+        if (!user) {
+          location.href = "login.html?next=" + encodeURIComponent("schedules.html?trip=" + tripId);
+          return;
+        }
+        const ok = await BB.confirmBox(`Reserve ${seats} seat(s) on the ${BB.fmtTime(departure)} trip?`, "Reserve");
+        if (!ok) return;
+        BB.busy(btn, true, "Reserving…");
+        const { error } = await BB.db.rpc("book_seat", { p_trip_id: tripId, p_seats: seats });
+        BB.busy(btn, false);
+
+        if (!error) {
+          BB.toast("Seat reserved!", "ok");
+          const box = BB.$("#book-result");
+          box.className = "alert alert-ok";
+          box.innerHTML = `Reserved ${seats} seat(s) on the ${BB.esc(BB.fmtDateTime(departure))} trip.
+                           <a href="bookings.html">See my bookings</a>`;
+          await loadTrips();
+          box.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+        // "FULL:" is checked on the raw message, before BB.errText removes it
+        if ((error.message || "").includes("FULL")) { await showNext(tripId, seats); return; }
+        BB.toast(BB.errText(error), "error");
+      }
+
+      // Show the next trip with enough free seats inside the card of the full trip
+      async function showNext(tripId, seats) {
+        const msg = BB.$("#msg-" + tripId);
+        const { data, error } = await BB.db.rpc("next_available_trip", { p_trip_id: tripId, p_seats: seats });
+        if (error) { BB.toast(BB.errText(error), "error"); return; }
+        const next = (data || [])[0];
+        if (!next) {
+          msg.innerHTML = `<div class="alert alert-warn">This bus is full and there is no later bus with free seats today.</div>`;
+          return;
+        }
+        msg.innerHTML = `<div class="alert alert-warn">This bus is full. The next bus with ${next.available_seats} free seats
+            leaves at ${BB.fmtTime(next.departure_time)} (${BB.esc(BB.fmtDate(next.departure_time))}).
+            <div style="margin-top:8px"><button class="btn btn-small">Reserve that one</button></div></div>`;
+        const b = BB.$("button", msg);
+        b.addEventListener("click", () => reserve(next.trip_id, seats, next.departure_time, b));
+      }
+
+      // ---------------------------------------------------------------
+      // 6. Start: show the route; if we came back from login (?trip=<id>),
+      //    scroll to that trip and highlight it
+      // ---------------------------------------------------------------
+      await showRoute();
+      const back = BB.param("trip");
+      const card = back && BB.$("#trip-" + Number(back));
+      if (card) {
+        card.classList.add("highlight");
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  </script>
+</body>
+</html>

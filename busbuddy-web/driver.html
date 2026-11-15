@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My trips – BusBuddy</title>
+  <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/vendor/supabase.js"></script>
+  <script src="js/vendor/leaflet/leaflet.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/demo-data.js"></script>
+  <script src="js/app.js"></script>
+  <style>
+    /* Page-specific layout only: big buttons for use on the driver's phone */
+    .driver-page { max-width: 760px; }
+    .run-label { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+    .seats-box { text-align: right; }
+    .seats-big { font-size: 36px; font-weight: bold; color: var(--green-dark); line-height: 1; }
+    #running .map-small { height: 240px; margin: 12px 0; }
+    .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .actions .btn { min-height: 56px; font-size: 17px; }
+    .actions-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    @media (max-width: 640px) { .actions, .actions-2 { grid-template-columns: 1fr; } }
+    .reasons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .reasons .tab { min-height: 44px; flex: 1 1 30%; }
+    #delayForm { margin-top: 14px; border-color: var(--amber); }
+    .pass-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+                padding: 10px 0; border-top: 1px solid var(--border); }
+    .pass-row .row { gap: 8px; }
+    .section-title { margin: 24px 0 10px; }
+    details.earlier { margin-top: 24px; }
+    details.earlier summary { cursor: pointer; font-weight: bold; color: var(--muted); padding: 10px 0; }
+    details.earlier .card { opacity: .7; box-shadow: none; }
+  </style>
+</head>
+<body>
+  <header id="topbar"></header>
+  <main class="container driver-page">
+    <h1>My trips</h1>
+    <div id="startMsg" class="hidden"></div>
+
+    <!-- A. Running trip (shown only while a trip is active or delayed) -->
+    <section id="running" class="card hidden">
+      <div class="run-label">Running trip</div>
+      <div class="row-between">
+        <div>
+          <div class="card-title" id="runRoute"></div>
+          <div class="row" id="runInfo"></div>
+        </div>
+        <div class="seats-box"><div class="muted">Seats</div><div class="seats-big" id="runSeats"></div></div>
+      </div>
+      <div id="shareStatus" class="hidden" style="margin-top:12px"></div>
+      <button class="btn btn-amber btn-block hidden" id="resumeBtn">Turn on location sharing</button>
+      <div id="driverMap" class="map map-small"></div>
+      <div class="actions">
+        <button class="btn btn-purple" id="walkOnBtn">Roadside passenger +1</button>
+        <button class="btn btn-amber" id="delayBtn">Report delay</button>
+        <button class="btn btn-danger" id="endBtn">End trip</button>
+      </div>
+
+      <!-- Report delay form (UC-16) -->
+      <div id="delayForm" class="card hidden">
+        <div class="card-title">Report delay</div>
+        <label>Reason</label>
+        <div class="reasons" id="reasons">
+          <button type="button" class="tab" data-r="Traffic">Traffic</button>
+          <button type="button" class="tab" data-r="Breakdown">Breakdown</button>
+          <button type="button" class="tab" data-r="Weather">Weather</button>
+          <button type="button" class="tab" data-r="Accident">Accident</button>
+          <button type="button" class="tab" data-r="Other">Other</button>
+        </div>
+        <div class="field hidden" id="otherWrap">
+          <label for="otherReason">Describe the reason</label>
+          <input id="otherReason" maxlength="100" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="delayMin">Minutes late</label>
+          <select id="delayMin">
+            <option>5</option><option selected>10</option><option>15</option><option>20</option>
+            <option>30</option><option>45</option><option>60</option>
+          </select>
+        </div>
+        <div id="delayMsg" class="hidden"></div>
+        <div class="actions-2">
+          <button type="button" class="btn btn-outline" id="delayCancel">Cancel</button>
+          <button type="button" class="btn btn-amber" id="delaySubmit">Submit</button>
+        </div>
+      </div>
+
+      <h3 class="section-title">Passengers on this trip</h3>
+      <div id="runPassengers"></div>
+    </section>
+
+    <!-- B. Upcoming trips -->
+    <section id="upcomingWrap" class="hidden">
+      <h2 class="section-title">Upcoming trips</h2>
+      <div id="upcoming"></div>
+    </section>
+
+    <!-- C. Earlier today -->
+    <details id="earlierWrap" class="earlier hidden">
+      <summary id="earlierTitle">Earlier today</summary>
+      <div id="earlier"></div>
+    </details>
+
+    <p id="emptyState" class="empty hidden">No trips assigned to you yet. The administrator assigns trips.</p>
+  </main>
+  <footer class="site-footer">BusBuddy · LIU senior project</footer>
+
+  <script>
+    BB.ready(async () => {
+      await BB.renderNav("driver.html");
+      if (!BB.db) return;                                   // setup not done yet
+      const user = await BB.requireRole(["driver"]);        // drivers only
+      if (!user) return;
+
+      // ---------------------------------------------------------------
+      // 1. Page state
+      // ---------------------------------------------------------------
+      const SHARE_SECONDS = BB_CONFIG.SHARE_SECONDS || 10;
+      let trips = [];            // rows from get_driver_trips()
+      let running = null;        // the trip that is active or delayed (at most one)
+      let stopsByRoute = {};     // { route_id: [stops] } for the small map
+      let upcomingKey = "";      // to re-draw the upcoming list only when something changed
+      const openLists = new Set();   // upcoming trips whose passenger list is open
+      let autoResumed = false;   // resume sharing once after a page reload
+      let map = null, mapLayer = null, mapTripId = null, busMarker = null;
+      let delayReason = "";
+
+      // Everything about location sharing (UC-15) is kept in this one object
+      const share = {
+        tripId: null,     // trip we are sharing for (null = not sharing)
+        watchId: null,    // id from geolocation.watchPosition
+        timer: null,      // id from setInterval (sends every SHARE_SECONDS)
+        wakeLock: null,   // keeps the phone screen on
+        lastFix: null,    // newest GPS position { lat, lng, speed, t }
+        lastSent: null,   // the position we sent last time
+        lastSentAt: null, // when it was sent
+        problem: null     // { type: "error"|"warn", text, from }
+      };
+
+      try { stopsByRoute = await BB.loadStopsByRoute(); } catch (e) { BB.toast(BB.errText(e), "error"); }
+
+      // ---------------------------------------------------------------
+      // 2. Location helpers (browser Geolocation API)
+      // ---------------------------------------------------------------
+      // The browser only gives the location on a secure page (https or localhost)
+      function locationProblem() {
+        if (!navigator.geolocation) return "This browser cannot share its location. Please use an up-to-date browser or the BusBuddy app.";
+        const local = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+        if (location.protocol !== "https:" && !local) return "Location only works on a secure page. Open BusBuddy with its https:// address, then try again.";
+        return null;
+      }
+      function geoErrorText(err) {
+        if (err.code === 1) return "Location is needed to start the trip. Allow location for this site in your browser (or app) settings, then try again.";
+        if (err.code === 3) return "Getting your position took too long. Check that GPS is on, then try again.";
+        return "Your position is not available. Turn on GPS / location on the phone, then try again.";
+      }
+      // Ask the browser for the position once (shows the permission question the first time)
+      const getPosition = () => new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
+      const toFix = (pos) => ({ lat: pos.coords.latitude, lng: pos.coords.longitude, speed: pos.coords.speed, t: pos.timestamp || Date.now() });
+      const clock = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+      // Speed in km/h: from the GPS if it gives one (m/s × 3.6),
+      // otherwise distance ÷ time since the position we sent last time, otherwise unknown
+      function speedKmh(fix) {
+        if (fix.speed != null && !isNaN(fix.speed)) return Math.round(fix.speed * 3.6 * 10) / 10;
+        const prev = share.lastSent;
+        if (prev && fix.t > prev.t) {
+          const hours = (fix.t - prev.t) / 3600000;
+          return Math.round(BB.distanceKm(prev.lat, prev.lng, fix.lat, fix.lng) / hours * 10) / 10;
+        }
+        return null;
+      }
+
+      // ---------------------------------------------------------------
+      // 3. Location sharing: watch the GPS, send every SHARE_SECONDS
+      // ---------------------------------------------------------------
+      function startSharing(tripId, firstFix) {
+        stopSharing();
+        share.tripId = tripId; share.lastFix = firstFix; share.problem = null;
+        // watchPosition keeps the newest position in share.lastFix
+        share.watchId = navigator.geolocation.watchPosition(onFix, onGeoError, { enableHighAccuracy: true, maximumAge: 5000 });
+        // setInterval and NOT BB.poll: BB.poll pauses when the tab is hidden, but sharing must go on.
+        // Note: browsers may still slow down timers in background tabs, so the Android app
+        // should keep the screen on (we also ask for a Wake Lock below).
+        share.timer = setInterval(sendPosition, SHARE_SECONDS * 1000);
+        keepScreenOn();
+        sendPosition();                         // send the first position immediately
+      }
+
+      function stopSharing() {
+        if (share.watchId != null) navigator.geolocation.clearWatch(share.watchId);
+        clearInterval(share.timer);
+        if (share.wakeLock) { share.wakeLock.release().catch(() => {}); }
+        Object.assign(share, { tripId: null, watchId: null, timer: null, wakeLock: null, lastFix: null, lastSent: null, lastSentAt: null });
+      }
+
+      function onFix(pos) {                     // a new GPS position arrived
+        share.lastFix = toFix(pos);
+        if (share.problem && share.problem.from === "gps") share.problem = null;
+        moveBus(); renderShareStatus();
+      }
+      function onGeoError(err) {                // GPS problem while sharing
+        if (err.code === 1) { stopSharing(); share.problem = { type: "error", text: geoErrorText(err), from: "denied" }; }
+        else share.problem = { type: "warn", text: "GPS signal lost. Still trying…", from: "gps" };
+        renderShareStatus();
+      }
+
+      async function sendPosition() {
+        const fix = share.lastFix;
+        if (!share.tripId || !fix) return;
+        // Same position as last time (bus waiting at a stop): resend it once a minute,
+        // so the admin monitor doesn't mark the bus as "No signal".
+        const same = fix === share.lastSent;
+        if (same && share.lastSentAt && Date.now() - share.lastSentAt.getTime() < 60000) return;
+        const { error } = await BB.db.rpc("share_location",
+          { p_trip_id: share.tripId, p_lat: fix.lat, p_lng: fix.lng, p_speed: same ? 0 : speedKmh(fix) });
+        if (error) {
+          share.problem = { type: "warn", text: "Last send failed: " + BB.errText(error) + " Trying again in " + SHARE_SECONDS + " s.", from: "send" };
+          renderShareStatus();
+          if (/not running/i.test(error.message || "")) { stopSharing(); loadTrips(); }  // e.g. admin ended the trip
+          return;
+        }
+        share.lastSent = fix; share.lastSentAt = new Date();
+        if (share.problem && share.problem.from === "send") share.problem = null;
+        renderShareStatus();
+      }
+
+      // Screen Wake Lock: stop the phone screen from turning off while the trip runs
+      async function keepScreenOn() {
+        if (!("wakeLock" in navigator) || share.wakeLock || document.hidden) return;
+        try {
+          share.wakeLock = await navigator.wakeLock.request("screen");
+          share.wakeLock.addEventListener("release", () => { share.wakeLock = null; });
+        } catch (e) { /* not supported or refused – sharing still works */ }
+      }
+      // The lock is dropped when the page is hidden, so ask again when it comes back
+      document.addEventListener("visibilitychange", () => { if (!document.hidden && share.tripId) keepScreenOn(); });
+      // Leaving the page: stop the GPS, the timer and the wake lock
+      window.addEventListener("pagehide", stopSharing);
+      window.addEventListener("pageshow", (e) => { if (e.persisted && running) resumeSharing(running); });
+
+      // After a reload (or "Turn on location sharing"): ask for the location again, then share
+      async function resumeSharing(trip) {
+        const problem = locationProblem();
+        if (problem) { share.problem = { type: "error", text: problem, from: "denied" }; return renderShareStatus(); }
+        BB.show("#shareStatus", "Getting your location…", "info");
+        try { startSharing(trip.trip_id, toFix(await getPosition())); }
+        catch (err) { share.problem = { type: "error", text: geoErrorText(err), from: "denied" }; }
+        renderShareStatus(); moveBus();
+      }
+
+      // The coloured status line under the running trip
+      function renderShareStatus() {
+        if (!running) return;
+        const on = share.tripId === running.trip_id;
+        BB.$("#resumeBtn").classList.toggle("hidden", on);
+        if (share.problem) return BB.show("#shareStatus", share.problem.text, share.problem.type);
+        if (!on) return BB.show("#shareStatus", "Location sharing is off. Passengers cannot see the bus.", "warn");
+        if (!share.lastSentAt) return BB.show("#shareStatus", "Waiting for GPS…", "info");
+        BB.show("#shareStatus", `Sharing your location every ${SHARE_SECONDS} s · last sent ${clock(share.lastSentAt)}`, "ok");
+      }
+
+      // ---------------------------------------------------------------
+      // 4. Small map: route stops + line + the bus following the GPS
+      // ---------------------------------------------------------------
+      function drawMap(trip) {
+        if (!window.L) return;
+        if (!map) { map = BB.makeMap("driverMap"); mapLayer = L.layerGroup().addTo(map); }
+        else map.invalidateSize();
+        if (mapTripId !== trip.trip_id) {          // new trip: draw its route once
+          mapTripId = trip.trip_id; mapLayer.clearLayers(); busMarker = null;
+          const stops = stopsByRoute[trip.route_id] || [];
+          const line = stops.map((s) => [s.latitude, s.longitude]);
+          stops.forEach((s) => L.marker([s.latitude, s.longitude], { icon: BB.stopIcon() }).bindPopup(BB.esc(s.address)).addTo(mapLayer));
+          if (line.length > 1) L.polyline(line, { color: "#534AB7", weight: 4, opacity: 0.7 }).addTo(mapLayer);
+          if (line.length) map.fitBounds(line, { padding: [20, 20] });
+        }
+        moveBus();
+      }
+      function moveBus() {
+        if (!map || !running || !share.lastFix) return;
+        const ll = [share.lastFix.lat, share.lastFix.lng];
+        if (!busMarker) busMarker = L.marker(ll, { icon: BB.busIcon(running.status), zIndexOffset: 1000 }).addTo(mapLayer);
+        else { busMarker.setLatLng(ll); busMarker.setIcon(BB.busIcon(running.status)); }
+      }
+
+      // ---------------------------------------------------------------
+      // 5. Load my trips (UC-13) and draw the three parts of the page
+      // ---------------------------------------------------------------
+      async function loadTrips() {
+        const { data, error } = await BB.db.rpc("get_driver_trips");
+        if (error) { BB.toast(BB.errText(error), "error"); return; }
+        trips = data || [];
+        running = trips.find((t) => t.status === "active" || t.status === "delayed") || null;
+        BB.$("#emptyState").classList.toggle("hidden", trips.length > 0);
+        if (!running && share.tripId) stopSharing();             // trip was ended (e.g. by the admin)
+        renderUpcoming(); renderEarlier();
+        await renderRunning();
+        if (running && share.tripId !== running.trip_id && !autoResumed) {   // page reloaded mid-trip
+          autoResumed = true; resumeSharing(running);
+        }
+      }
+
+      // Passenger list (shared by the running card and the upcoming trips) – UC-17
+      async function passengersHtml(tripId) {
+        const { data, error } = await BB.db.rpc("get_trip_passengers", { p_trip_id: tripId });
+        if (error) return `<div class="alert alert-error">${BB.esc(BB.errText(error))}</div>`;
+        if (!data || !data.length) return '<p class="muted">No passengers yet.</p>';
+        return data.map((p) => {
+          const booked = p.status === "booked" && p.passenger_id;
+          const contact = booked ? BB.telLink(p.phone_no, "Call") +   // phone call …
+            `<a class="btn btn-purple btn-small" href="messages.html?trip=${encodeURIComponent(tripId)}&passenger=${encodeURIComponent(p.passenger_id)}">Message</a>` : "";  // … or in-app message
+          return `<div class="pass-row">
+              <div><b>${BB.esc(booked ? p.full_name : "Roadside passenger")}</b>
+                <div class="row muted">${p.nb_of_seats} seat${p.nb_of_seats > 1 ? "s" : ""} ${BB.badge(p.status)}</div></div>
+              <div class="row">${contact}</div></div>`;
+        }).join("");
+      }
+
+      // A. Running trip card
+      async function renderRunning() {
+        BB.$("#running").classList.toggle("hidden", !running);
+        if (!running) return;
+        const t = running;
+        BB.$("#runRoute").textContent = t.route_name;
+        BB.$("#runInfo").innerHTML = `${BB.badge(t.status)} <span>${BB.esc(t.plate_number)}</span>
+          <span class="muted">Departure ${BB.fmtTime(t.departure_time)}</span>`;
+        BB.$("#runSeats").textContent = `${t.seats_taken} / ${t.capacity}`;
+        BB.$("#walkOnBtn").disabled = t.seats_taken >= t.capacity;       // bus is full
+        renderShareStatus();
+        drawMap(t);
+        BB.$("#runPassengers").innerHTML = await passengersHtml(t.trip_id);
+      }
+
+      // B. Upcoming (scheduled) trips
+      function renderUpcoming() {
+        const list = trips.filter((t) => t.status === "scheduled");
+        BB.$("#upcomingWrap").classList.toggle("hidden", !list.length);
+        const key = JSON.stringify(list) + !!running;
+        if (key === upcomingKey) return;             // nothing changed: keep open lists as they are
+        upcomingKey = key;
+        BB.$("#upcoming").innerHTML = list.map((t) => `
+          <div class="card" data-id="${t.trip_id}">
+            <div class="row-between"><div class="card-title">${BB.esc(t.route_name)}</div>${BB.badge(t.status)}</div>
+            <div><b>${BB.fmtDateTime(t.departure_time)}</b> · ${BB.esc(t.plate_number)} · Seats ${t.seats_taken} / ${t.capacity}</div>
+            <div class="actions-2">
+              <button class="btn btn-outline" data-act="pass">Passengers</button>
+              <button class="btn" data-act="start" ${running ? "disabled" : ""}>Start trip</button>
+            </div>
+            ${running ? '<p class="muted" style="margin:8px 0 0">End your running trip first.</p>' : ""}
+            <div class="pass-list hidden" style="margin-top:10px"></div>
+          </div>`).join("");
+        openLists.forEach((id) => {                  // re-open the lists that were open
+          const c = BB.$(`#upcoming [data-id="${id}"]`);
+          if (c) togglePassengers(c, true); else openLists.delete(id);
+        });
+      }
+
+      async function togglePassengers(c, forceOpen) {
+        const box = BB.$(".pass-list", c), id = c.dataset.id;
+        const open = forceOpen || box.classList.contains("hidden");
+        box.classList.toggle("hidden", !open);
+        BB.$('[data-act="pass"]', c).textContent = open ? "Hide passengers" : "Passengers";
+        if (!open) { openLists.delete(id); return; }
+        openLists.add(id);
+        if (!box.innerHTML) box.innerHTML = '<p class="muted">Loading…</p>';
+        box.innerHTML = await passengersHtml(Number(id));
+      }
+
+      // C. Completed / cancelled trips of today
+      function renderEarlier() {
+        const today = new Date().toDateString();
+        const list = trips.filter((t) => ["completed", "cancelled"].includes(t.status)
+                                      && new Date(t.departure_time).toDateString() === today);
+        BB.$("#earlierWrap").classList.toggle("hidden", !list.length);
+        BB.$("#earlierTitle").textContent = `Earlier today (${list.length})`;
+        BB.$("#earlier").innerHTML = list.map((t) => `
+          <div class="card"><div class="row-between"><b>${BB.esc(t.route_name)}</b>${BB.badge(t.status)}</div>
+            <div class="muted">${BB.fmtTime(t.departure_time)} · ${BB.esc(t.plate_number)} · Seats ${t.seats_taken} / ${t.capacity}</div></div>`).join("");
+      }
+
+      // ---------------------------------------------------------------
+      // 6. Start trip (UC-14 + UC-15): location FIRST, then start, then share
+      // ---------------------------------------------------------------
+      async function startTrip(tripId, btn) {
+        BB.show("#startMsg", "");
+        const problem = locationProblem();
+        if (problem) return BB.show("#startMsg", problem, "error");
+        BB.busy(btn, true, "Getting your location…");
+        let fix;
+        try { fix = toFix(await getPosition()); }
+        catch (err) { BB.busy(btn, false); return BB.show("#startMsg", geoErrorText(err), "error"); }  // do NOT start
+        const { error } = await BB.db.rpc("start_trip", { p_trip_id: tripId });
+        BB.busy(btn, false);
+        if (error) return BB.toast(BB.errText(error), "error");
+        autoResumed = true;
+        startSharing(tripId, fix);                   // sends the first position right away
+        BB.toast("Trip started. Your location is being shared.", "ok");
+        await loadTrips();
+        window.scrollTo(0, 0);
+      }
+
+      BB.$("#upcoming").addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-act]");
+        if (!btn) return;
+        const c = btn.closest("[data-id]");
+        if (btn.dataset.act === "pass") togglePassengers(c);
+        else startTrip(Number(c.dataset.id), btn);
+      });
+      BB.$("#resumeBtn").addEventListener("click", () => { share.problem = null; if (running) resumeSharing(running); });
+
+      // ---------------------------------------------------------------
+      // 7. Running trip buttons: roadside walk-on, report delay, end trip
+      // ---------------------------------------------------------------
+      // A passenger got on at the roadside: one more seat taken (free seats update for everyone)
+      BB.$("#walkOnBtn").addEventListener("click", async (e) => {
+        BB.busy(e.target, true, "Saving…");
+        const { error } = await BB.db.rpc("record_walk_on", { p_trip_id: running.trip_id, p_seats: 1 });
+        BB.busy(e.target, false);
+        if (error) return BB.toast(BB.errText(error), "error");
+        BB.toast("Roadside passenger added.", "ok");
+        await loadTrips();
+      });
+
+      // Report delay (UC-16): open the form, pick a reason and minutes, submit
+      BB.$("#delayBtn").addEventListener("click", () => {
+        BB.$("#delayForm").classList.toggle("hidden");
+        BB.show("#delayMsg", "");
+      });
+      BB.$("#delayCancel").addEventListener("click", () => BB.$("#delayForm").classList.add("hidden"));
+      BB.$("#reasons").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-r]");
+        if (!b) return;
+        delayReason = b.dataset.r;
+        BB.$$("#reasons .tab").forEach((x) => x.classList.toggle("active", x === b));
+        BB.$("#otherWrap").classList.toggle("hidden", delayReason !== "Other");
+        if (delayReason === "Other") BB.$("#otherReason").focus();
+      });
+      BB.$("#delaySubmit").addEventListener("click", async (e) => {
+        const reason = delayReason === "Other" ? BB.$("#otherReason").value.trim() : delayReason;
+        if (!reason) return BB.show("#delayMsg", delayReason === "Other" ? "Please describe the reason." : "Please choose a reason.", "error");
+        BB.busy(e.target, true, "Sending…");
+        const { error } = await BB.db.rpc("report_delay",
+          { p_trip_id: running.trip_id, p_reason: reason, p_minutes: Number(BB.$("#delayMin").value) });
+        BB.busy(e.target, false);
+        if (error) return BB.show("#delayMsg", BB.errText(error), "error");
+        BB.toast("Delay reported. Passengers will see it.", "ok");
+        BB.$("#delayForm").classList.add("hidden");   // the trip keeps running and sharing
+        await loadTrips();
+      });
+
+      // End trip (UC-14): confirm, end it in the database, stop sharing
+      BB.$("#endBtn").addEventListener("click", async (e) => {
+        if (!(await BB.confirmBox("End this trip? Location sharing will stop.", "End trip"))) return;
+        BB.busy(e.target, true, "Ending…");
+        const { error } = await BB.db.rpc("end_trip", { p_trip_id: running.trip_id });
+        BB.busy(e.target, false);
+        if (error) return BB.toast(BB.errText(error), "error");
+        stopSharing();
+        BB.$("#delayForm").classList.add("hidden");
+        BB.toast("Trip ended. Location sharing stopped.", "ok");
+        await loadTrips();
+      });
+
+      // ---------------------------------------------------------------
+      // 8. Refresh trips and seats every 30 s so new bookings appear
+      // ---------------------------------------------------------------
+      BB.poll(loadTrips, 30);
+    });
+  </script>
+</body>
+</html>
