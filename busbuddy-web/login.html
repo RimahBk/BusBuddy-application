@@ -5,22 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Log in – BusBuddy</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/pages/login.css">
   <script src="js/vendor/supabase.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/demo-data.js"></script>
-  <script src="js/app.js"></script>
-  <style>
-    /* Login page only */
-    main.container.narrow { max-width: 440px; }   /* style.css's main.container rule would otherwise win over .narrow */
-    .pw-row { display: flex; gap: 8px; }
-    .pw-row input { flex: 1; }
-    .pw-row .btn { flex: none; min-width: 72px; }
-    .links { text-align: center; margin: 14px 0 0; }
-    .links p { margin: 6px 0; }
-    .app-card { margin-top: 18px; border: 2px dashed var(--border); border-radius: var(--radius);
-                padding: 14px 16px; text-align: center; background: var(--white); }
-    .app-card .muted { margin: 4px 0 0; }
-  </style>
 </head>
 <body>
   <header id="topbar"></header>
@@ -65,100 +52,6 @@
 
   <footer class="site-footer">BusBuddy · LIU senior project</footer>
 
-  <script>
-    // Where to go after logging in.
-    // A "?next=" page is only accepted if it is a plain page name of this site
-    // (like "bookings.html" or "messages.html?trip=3"), so the link cannot send people to another website.
-    function safeNext() {
-      const next = BB.param("next");
-      if (!next) return null;
-      const okShape = /^[a-z-]+\.html(\?[^\s]*)?$/i.test(next);
-      if (!okShape || next.includes("/") || next.includes(":")) return null;
-      return next;
-    }
-
-    // Read the user's type (passenger / driver / admin) from the users table
-    async function homeOf(userId) {
-      const { data, error } = await BB.db.from("users").select("type").eq("user_id", userId).maybeSingle();
-      if (error) throw error;
-      return data ? data.type : null;
-    }
-
-    BB.ready(async () => {
-      // 1. Navigation bar; hide the app card when we are already inside the Android app
-      await BB.renderNav("login.html");
-      if (BB.inApp) BB.$("#appCard").classList.add("hidden");
-      if (!BB.db) return;                          // setup not done yet
-
-      const msg = BB.$("#msg");
-      if (BB.param("next")) BB.show(msg, "Please log in to continue.", "info");
-
-      // 2. Already logged in? Go straight to the right page
-      const current = await BB.getUser();
-      if (current) { location.replace(safeNext() || BB.homeFor(current.type)); return; }
-
-      // 3. Show / hide the password
-      BB.$("#togglePw").addEventListener("click", (e) => {
-        const input = BB.$("#password");
-        const hidden = input.type === "password";
-        input.type = hidden ? "text" : "password";
-        e.target.textContent = hidden ? "Hide" : "Show";
-        e.target.setAttribute("aria-label", hidden ? "Hide password" : "Show password");
-      });
-
-      // 4. Log in
-      BB.$("#loginForm").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = BB.$("#email").value.trim();
-        const password = BB.$("#password").value;
-        if (!email || !password) { BB.show(msg, "Please type your email and password.", "error"); return; }
-
-        const btn = BB.$("#loginBtn");
-        BB.busy(btn, true, "Logging in…");
-        BB.show(msg, "");
-        try {
-          const { data, error } = await BB.db.auth.signInWithPassword({ email, password });
-          if (error) {
-            const wrong = /invalid login credentials/i.test(error.message || "");
-            const unconfirmed = /email not confirmed/i.test(error.message || "");
-            BB.show(msg, wrong ? "Wrong email or password."
-                       : unconfirmed ? "Please confirm your email first (check your inbox), then log in."
-                       : BB.errText(error), "error");
-            return;
-          }
-
-          // Every account needs a row in the users table (it holds the user type)
-          const type = await homeOf(data.user.id);
-          if (!type) {
-            await BB.db.auth.signOut();
-            BB.show(msg, "Your account has no BusBuddy profile yet. Contact the administrator.", "error");
-            return;
-          }
-
-          // Full page load, so the next page reads the new login fresh
-          location.href = safeNext() || BB.homeFor(type);
-        } catch (err) {
-          BB.show(msg, BB.errText(err), "error");
-        } finally {
-          BB.busy(btn, false);
-        }
-      });
-
-      // 5. Forgot password: Supabase emails a link that opens reset-password.html
-      BB.$("#forgotBtn").addEventListener("click", async (e) => {
-        const email = BB.$("#email").value.trim();
-        if (!email) { BB.show(msg, "Type your email above first, then press \"Forgot password?\".", "error"); BB.$("#email").focus(); return; }
-        BB.busy(e.target, true, "Sending…");
-        const { error } = await BB.db.auth.resetPasswordForEmail(email, {
-          redirectTo: new URL("reset-password.html", location.href).href
-        });
-        BB.busy(e.target, false);
-        // Same message whether or not the email exists (we don't reveal who has an account),
-        // except for a network problem, which the user needs to know about
-        if (error && /fetch/i.test(error.message || "")) { BB.show(msg, BB.errText(error), "error"); return; }
-        BB.show(msg, "If this email has an account, a reset link is on its way.", "ok");
-      });
-    });
-  </script>
+  <script type="module" src="js/pages/login-page.js"></script>
 </body>
 </html>

@@ -32,16 +32,27 @@ busbuddy-web/
 ├── driver.html           Driver: trips, start/end, share location, delay, walk-ons
 ├── monitor.html          Admin: live fleet monitor
 ├── admin.html            Admin: buses, routes & stops, trips, accounts
-├── css/style.css         One shared style for every page
-├── js/config.js          YOUR Supabase URL and key (the only file you edit)
-├── js/app.js             Shared code: login check, menu, map, ETA, polling
-├── js/demo-data.js       Offline sample data (used when DEMO_MODE is true)
-├── js/vendor/            Local copies of Leaflet 1.9.4 and supabase-js 2.118.0 (no CDN needed)
+├── css/
+│   ├── style.css         One shared style for every page
+│   └── pages/            Extra styles for one page each (map.css, driver.css, …)
+├── js/
+│   ├── config.js         YOUR Supabase URL and key (the only file you edit)
+│   ├── core/             Shared classes, joined together in bb.js as the BB object:
+│   │                     Dom, Format, Ui, Connection, Session, NavBar, Banners, Poller, MapKit, Eta
+│   ├── demo/             Offline demo backend (used when DEMO_MODE is true):
+│   │                     DemoClient, DemoStore, DemoQuery, DemoRpc, sample data
+│   ├── pages/            One class per page (map-page.js → MapPage, …), all extend Page
+│   └── vendor/           Local copies of Leaflet 1.9.4 and supabase-js 2.118.0 (no CDN needed)
 ├── android-app/          MainActivity.java + layout + manifest lines for the offline Android app
-├── api/admin.js          Vercel Function: create driver accounts, deactivate users
+├── api/
+│   ├── admin.js          Vercel Function entry: POST /api/admin
+│   └── _lib/             AdminController (checks the caller), AdminService (the actions), HttpError
 ├── package.json          Lists the one library the Vercel Function needs
 └── supabase/schema.sql   The whole database: tables, security rules, functions
 ```
+
+Each page loads `js/vendor/…`, then `js/config.js`, then one ES module: `<script type="module" src="js/pages/<page>-page.js">`.
+ES modules only work over `http://` or `https://`, never by double-clicking the file (see section 4).
 
 ## 2. Create the database (Supabase)
 
@@ -101,6 +112,10 @@ Open the folder in VS Code → right-click `index.html` → **Open with Live Ser
 The site is served over HTTPS by Vercel, which the GPS (Geolocation API) requires.
 
 ## 7. Android app (WebView)
+
+> **Ready-made project:** `../busbuddy-android/` is a complete Android Studio project of the offline app.
+> Open that folder in Android Studio and press Run. Its build copies this website into the app automatically
+> (see its README). The steps below describe the online version.
 
 The Android app shows this same website, so the login, data and pages are shared – there is no separate login API.
 The pages already avoid `alert()`/`confirm()` popups and work at phone width. In Android Studio:

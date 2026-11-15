@@ -1,0 +1,13 @@
+/* bookings.html only */
+/* Page-specific layout only */
+.booking-meta { margin: 8px 0 12px; display: grid; gap: 2px; font-size: 15px; }
+.booking-actions { margin-top: 4px; }
+.phone-line { margin-top: 10px; font-size: 15px; }
+.phone-line a { font-weight: bold; }
+.card.past { opacity: .75; box-shadow: none; }
+details.past-list { margin-top: 24px; }
+details.past-list > summary {
+  cursor: pointer; font-weight: bold; color: var(--green-dark);
+  padding: 12px 0; min-height: 44px; font-size: 17px;
+}
+.note { font-size: 14px; color: var(--red); margin-top: 6px; }
