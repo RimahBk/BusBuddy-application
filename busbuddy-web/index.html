@@ -5,28 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome – BusBuddy</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/pages/index.css">
   <script src="js/vendor/supabase.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/demo-data.js"></script>
-  <script src="js/app.js"></script>
-  <style>
-    /* Welcome page only */
-    .hero { text-align: center; padding: 28px 0 8px; max-width: 640px; margin: 0 auto; }
-    .hero h1 { font-size: 30px; margin-bottom: 10px; }
-    .hero .lead { font-size: 17px; color: var(--muted); margin-bottom: 22px; }
-    .hero-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .hero-buttons .btn { font-size: 17px; min-height: 54px; }
-    .account-links { margin: 18px 0 0; font-size: 15px; }
-    .account-links a { font-weight: bold; }
-    .features { margin-top: 36px; }
-    .features .card + .card { margin-top: 0; }   /* the grid gap already spaces the cards */
-    .feature .icon { font-size: 26px; margin-bottom: 6px; }
-    .feature p { margin: 0; }
-    @media (max-width: 520px) {
-      .hero h1 { font-size: 25px; }
-      .hero-buttons { grid-template-columns: 1fr; }
-    }
-  </style>
 </head>
 <body>
   <header id="topbar"></header>
@@ -75,21 +56,6 @@
 
   <footer class="site-footer">BusBuddy · LIU senior project</footer>
 
-  <script>
-    BB.ready(async () => {
-      // 1. Draw the top navigation bar (no item is highlighted on the welcome page)
-      await BB.renderNav("index.html");
-      if (!BB.db) return;                       // setup not done yet – the banner explains
-
-      // 2. If someone is already logged in, swap "Log in / Create an account"
-      //    for one button that takes them to their own home page
-      const user = await BB.getUser();
-      if (user) {
-        BB.$("#homeBtn").href = BB.homeFor(user.type);
-        BB.$("#guestLinks").classList.add("hidden");
-        BB.$("#userLinks").classList.remove("hidden");
-      }
-    });
-  </script>
+  <script type="module" src="js/pages/index-page.js"></script>
 </body>
 </html>

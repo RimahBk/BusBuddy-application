@@ -1,0 +1,21 @@
+/* driver.html only */
+/* Page-specific layout only: big buttons for use on the driver's phone */
+.driver-page { max-width: 760px; }
+.run-label { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+.seats-box { text-align: right; }
+.seats-big { font-size: 36px; font-weight: bold; color: var(--green-dark); line-height: 1; }
+#running .map-small { height: 240px; margin: 12px 0; }
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.actions .btn { min-height: 56px; font-size: 17px; }
+.actions-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+@media (max-width: 640px) { .actions, .actions-2 { grid-template-columns: 1fr; } }
+.reasons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.reasons .tab { min-height: 44px; flex: 1 1 30%; }
+#delayForm { margin-top: 14px; border-color: var(--amber); }
+.pass-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+            padding: 10px 0; border-top: 1px solid var(--border); }
+.pass-row .row { gap: 8px; }
+.section-title { margin: 24px 0 10px; }
+details.earlier { margin-top: 24px; }
+details.earlier summary { cursor: pointer; font-weight: bold; color: var(--muted); padding: 10px 0; }
+details.earlier .card { opacity: .7; box-shadow: none; }

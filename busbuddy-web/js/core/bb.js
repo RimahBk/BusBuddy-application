@@ -1,0 +1,91 @@
+// =====================================================================
+// BB – the one object every page uses (Facade).
+// It wires the core classes together and exposes them under short names,
+// so page code can write BB.db, BB.$, BB.toast, BB.requireRole, …
+//
+// Load order on every page:
+//   js/vendor/supabase.js → [js/vendor/leaflet/leaflet.js, map pages only]
+//   → js/config.js (defines window.BB_CONFIG) → <script type="module" src="js/pages/<page>.js">
+// =====================================================================
+import { Dom } from "./dom.js";
+import { Format } from "./format.js";
+import { Ui } from "./ui.js";
+import { Connection } from "./connection.js";
+import { Session } from "./session.js";
+import { NavBar } from "./navbar.js";
+import { Banners } from "./banners.js";
+import { Poller } from "./poller.js";
+import { MapKit } from "./map-kit.js";
+import { Eta } from "./eta.js";
+
+const cfg = window.BB_CONFIG || {};
+const connection = new Connection(cfg);
+const session = new Session(connection.db);
+const navBar = new NavBar(session);
+const banners = new Banners(connection);
+const mapKit = new MapKit(cfg, connection.db);
+
+export const BB = {
+  // 1. Settings and database connection
+  config: cfg,
+  db: connection.db,
+  demo: connection.demo,
+  configured: connection.configured,
+  inApp: navigator.userAgent.includes("BusBuddyApp"),   // the Android app adds "BusBuddyApp" to its user agent
+
+  // 2. Small helpers
+  $: Dom.$,
+  $$: Dom.$$,
+  param: Dom.param,
+  esc: Dom.esc,
+  fmtTime: Format.time,
+  fmtDate: Format.date,
+  fmtDateTime: Format.dateTime,
+  minutesAgo: Format.minutesAgo,
+  badge: Format.badge,
+  errText: Format.errText,
+  telLink: Format.telLink,
+
+  // 3. Toast, confirm box, busy buttons, message boxes
+  toast: Ui.toast,
+  confirmBox: Ui.confirmBox,
+  busy: Ui.busy,
+  show: Ui.show,
+
+  // 4. Logged-in user
+  HOME: Session.HOME,
+  getUser: () => session.getUser(),
+  requireRole: (roles) => session.requireRole(roles),
+  homeFor: (type) => session.homeFor(type),
+  logout: () => session.logout(),
+
+  // 5. Navigation bar and banners
+  renderNav: (active) => navBar.render(active),
+  setupBanner: () => banners.setup(),
+  demoBanner: () => banners.demo(),
+
+  // Run page code after the page has loaded:  BB.ready(async () => { ... })
+  ready(fn) {
+    const run = () => { BB.setupBanner(); Promise.resolve(fn()).catch((e) => { console.error(e); BB.toast(BB.errText(e), "error"); }); };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run); else run();
+  },
+
+  // 6. Polling – call fn now and every `seconds`; returns a function that stops it
+  poll: (fn, seconds) => {
+    const poller = new Poller(fn, seconds || cfg.POLL_SECONDS || 10).start();
+    return () => poller.stop();
+  },
+
+  // 7. Maps
+  makeMap: (elementId) => mapKit.makeMap(elementId),
+  busIcon: MapKit.busIcon,
+  stopIcon: MapKit.stopIcon,
+  loadStopsByRoute: () => mapKit.loadStopsByRoute(),
+
+  // 8. ETA
+  distanceKm: Eta.distanceKm,
+  computeEta: Eta.compute
+};
+
+// Also available as window.BB, handy for trying things in the browser console
+window.BB = BB;

@@ -1,0 +1,17 @@
+/* index.html only */
+/* Welcome page only */
+.hero { text-align: center; padding: 28px 0 8px; max-width: 640px; margin: 0 auto; }
+.hero h1 { font-size: 30px; margin-bottom: 10px; }
+.hero .lead { font-size: 17px; color: var(--muted); margin-bottom: 22px; }
+.hero-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hero-buttons .btn { font-size: 17px; min-height: 54px; }
+.account-links { margin: 18px 0 0; font-size: 15px; }
+.account-links a { font-weight: bold; }
+.features { margin-top: 36px; }
+.features .card + .card { margin-top: 0; }   /* the grid gap already spaces the cards */
+.feature .icon { font-size: 26px; margin-bottom: 6px; }
+.feature p { margin: 0; }
+@media (max-width: 520px) {
+  .hero h1 { font-size: 25px; }
+  .hero-buttons { grid-template-columns: 1fr; }
+}

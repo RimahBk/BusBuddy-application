@@ -1,0 +1,13 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+
+# Release signing: never commit these (keep a backup copy somewhere safe)
+keystore/
+keystore.properties
+dist/

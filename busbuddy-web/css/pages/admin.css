@@ -1,0 +1,10 @@
+/* admin.html only */
+.panel { margin-top: 4px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 14px; }
+.panel td { white-space: nowrap; }
+.actions .btn + .btn { margin-left: 6px; }
+td .lic { margin-top: 6px; min-width: 150px; }
+td select { min-width: 130px; padding: 8px; }
+.num-tip { background: var(--purple); color: #fff; border: none; font-weight: bold; padding: 1px 6px; }
+.num-tip::before { display: none; }
+#route-map { height: 45vh; margin-bottom: 8px; }

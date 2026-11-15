@@ -3,7 +3,7 @@
 // Supabase dashboard → Connect (or Settings → API Keys)
 // =====================================================================
 window.BB_CONFIG = {
-  // DEMO_MODE: true  → the site runs OFFLINE with sample data (js/demo-data.js). No Supabase or Vercel needed.
+  // DEMO_MODE: true  → the site runs OFFLINE with sample data (js/demo/). No Supabase or Vercel needed.
   // DEMO_MODE: false → the site uses your real Supabase project below.
   DEMO_MODE: true,
 

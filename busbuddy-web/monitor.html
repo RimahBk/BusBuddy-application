@@ -6,24 +6,10 @@
   <title>Fleet monitor – BusBuddy</title>
   <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/pages/monitor.css">
   <script src="js/vendor/supabase.js"></script>
   <script src="js/vendor/leaflet/leaflet.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/demo-data.js"></script>
-  <script src="js/app.js"></script>
-  <style>
-    .stat { text-align: center; padding: 14px; }
-    .stat-value { font-size: 26px; font-weight: bold; color: var(--green-dark); }
-    .stat-label { font-size: 14px; color: var(--muted); }
-    .stats { margin-bottom: 14px; }
-    .stats .card + .card { margin-top: 0; }
-    @media (max-width: 820px) { .stats.grid-3 { grid-template-columns: repeat(3, 1fr); gap: 8px; } .stat { padding: 10px 6px; } .stat-value { font-size: 20px; } .stat-label { font-size: 12px; } }
-    #fleet-table tbody tr { cursor: pointer; }
-    #fleet-table td { white-space: nowrap; }
-    .no-signal { color: var(--amber); font-weight: bold; font-size: 13px; display: block; }
-    .map-wrap { margin-bottom: 16px; }
-    #fleet-map { height: 50vh; }
-  </style>
 </head>
 <body>
   <header id="topbar"></header>
@@ -50,135 +36,6 @@
   </main>
   <footer class="site-footer">BusBuddy · LIU senior project</footer>
 
-  <script>
-    BB.ready(async () => {
-      await BB.renderNav("monitor.html");
-      if (!BB.db) return;                                   // setup not done yet
-      const user = await BB.requireRole(["admin"]);         // administrators only (UC-19)
-      if (!user) return;
-
-      const STALE = BB_CONFIG.STALE_MINUTES || 3;
-      BB.$("#stale-min").textContent = STALE;
-
-      // ---------------------------------------------------------------
-      // 1. Map with every route drawn as a line through its stops
-      // ---------------------------------------------------------------
-      const map = BB.makeMap("fleet-map");
-      const stopsByRoute = await BB.loadStopsByRoute();
-      const allStops = [];
-      Object.values(stopsByRoute).forEach((stops) => {
-        const line = stops.map((s) => [s.latitude, s.longitude]);
-        L.polyline(line, { color: "#534AB7", weight: 4, opacity: 0.6 }).addTo(map);
-        stops.forEach((s) => {
-          L.marker([s.latitude, s.longitude], { icon: BB.stopIcon() }).addTo(map).bindTooltip(BB.esc(s.address));
-          allStops.push([s.latitude, s.longitude]);
-        });
-      });
-      if (allStops.length) map.fitBounds(allStops, { padding: [30, 30] });
-
-      const markers = {};   // trip_id → Leaflet marker of that bus
-      let trips = [];       // last result of admin_fleet()
-
-      // Is this bus's last position too old (or missing)?
-      const isStale = (t) => !t.last_update || BB.minutesAgo(t.last_update) > STALE;
-
-      // Text shown in the Last update column / popup
-      const lastText = (t) => {
-        if (!t.last_update) return "never";
-        const m = BB.minutesAgo(t.last_update);
-        return m < 1 ? "just now" : m + " min ago";
-      };
-      const delayText = (t) => t.delay_minutes ? `${t.delay_minutes} min – ${t.delay_reason || ""}` : "–";
-
-      // ---------------------------------------------------------------
-      // 2. Load running trips and redraw the numbers, markers and table
-      // ---------------------------------------------------------------
-      async function refresh() {
-        const { data, error } = await BB.db.rpc("admin_fleet");
-        if (error) { BB.toast(BB.errText(error), "error"); return; }
-        trips = data || [];
-        BB.$("#updated-at").textContent = "Updated " + BB.fmtTime(new Date().toISOString());
-        drawStats();
-        drawMarkers();
-        drawTable();
-      }
-
-      function drawStats() {
-        const seats = trips.reduce((s, t) => s + (t.seats_taken || 0), 0);
-        const cap = trips.reduce((s, t) => s + (t.capacity || 0), 0);
-        BB.$("#stat-running").textContent = trips.length;
-        BB.$("#stat-delayed").textContent = trips.filter((t) => t.status === "delayed").length;
-        BB.$("#stat-seats").textContent = seats + " / " + cap;
-      }
-
-      function drawMarkers() {
-        const seen = {};
-        trips.forEach((t) => {
-          if (t.latitude == null) return;                      // no position yet
-          seen[t.trip_id] = true;
-          const popup = `<b>${BB.esc(t.route_name)}</b><br>Bus ${BB.esc(t.plate_number)}<br>
-            Driver: ${BB.esc(t.driver_name)}<br>Seats: ${t.seats_taken} / ${t.capacity}<br>
-            Last update: ${lastText(t)}<br>Delay: ${BB.esc(delayText(t))}`;
-          if (markers[t.trip_id]) {                            // move the existing marker
-            markers[t.trip_id].setLatLng([t.latitude, t.longitude]).setIcon(BB.busIcon(t.status)).setPopupContent(popup);
-          } else {                                             // first time: create it
-            markers[t.trip_id] = L.marker([t.latitude, t.longitude], { icon: BB.busIcon(t.status) }).addTo(map).bindPopup(popup);
-          }
-        });
-        // remove buses whose trip is no longer running
-        Object.keys(markers).forEach((id) => { if (!seen[id]) { map.removeLayer(markers[id]); delete markers[id]; } });
-      }
-
-      function drawTable() {
-        const box = BB.$("#fleet-box");
-        if (!trips.length) { box.innerHTML = '<div class="empty">No buses are running right now.</div>'; return; }
-        box.innerHTML = `<div class="table-wrap"><table id="fleet-table">
-          <thead><tr><th>Route</th><th>Bus</th><th>Driver</th><th>Status</th><th>Seats</th><th>Last update</th><th>Delay</th><th></th></tr></thead>
-          <tbody>${trips.map((t) => `
-            <tr data-trip="${t.trip_id}" class="${isStale(t) ? "warn" : ""}">
-              <td>${BB.esc(t.route_name)}</td>
-              <td>${BB.esc(t.plate_number)}</td>
-              <td>${BB.esc(t.driver_name)}<br>${BB.telLink(t.driver_phone, "Call")}</td>
-              <td>${BB.badge(t.status)}</td>
-              <td>${t.seats_taken} / ${t.capacity}</td>
-              <td>${lastText(t)}${isStale(t) ? '<span class="no-signal">No signal</span>' : ""}</td>
-              <td>${BB.esc(delayText(t))}</td>
-              <td><button class="btn btn-danger btn-small" data-end="${t.trip_id}">End trip</button></td>
-            </tr>`).join("")}</tbody></table></div>`;
-      }
-
-      // ---------------------------------------------------------------
-      // 3. Table clicks: "End trip" button, or a row → pan the map to that bus
-      // ---------------------------------------------------------------
-      BB.$("#fleet-box").addEventListener("click", async (e) => {
-        if (e.target.closest("a")) return;                   // the Call link works on its own
-        const endBtn = e.target.closest("[data-end]");
-        if (endBtn) {
-          const t = trips.find((x) => String(x.trip_id) === endBtn.dataset.end);
-          const ok = await BB.confirmBox(`End the trip of bus ${t ? t.plate_number : ""} now? It will disappear from the live map.`, "End trip");
-          if (!ok) return;
-          BB.busy(endBtn, true, "Ending…");
-          const { error } = await BB.db.rpc("end_trip", { p_trip_id: Number(endBtn.dataset.end) });
-          if (error) { BB.busy(endBtn, false); BB.toast(BB.errText(error), "error"); return; }
-          BB.toast("Trip ended.", "ok");
-          await refresh();
-          return;
-        }
-        const row = e.target.closest("tr[data-trip]");
-        if (!row) return;
-        const m = markers[row.dataset.trip];
-        if (!m) { BB.toast("This bus has not sent a position yet."); return; }
-        map.setView(m.getLatLng(), 14);
-        m.openPopup();
-        BB.$("#fleet-map").scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-
-      // ---------------------------------------------------------------
-      // 4. Polling: refresh every POLL_SECONDS, stop when leaving the page
-      // ---------------------------------------------------------------
-      const stop = BB.poll(refresh, BB_CONFIG.POLL_SECONDS);
-      window.addEventListener("pagehide", stop);
-    });
-  </script>
+  <script type="module" src="js/pages/monitor-page.js"></script>
 </body>
 </html>

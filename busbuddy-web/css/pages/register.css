@@ -1,0 +1,5 @@
+/* register.html only */
+/* Register page only */
+main.container.narrow { max-width: 440px; }   /* style.css's main.container rule would otherwise win over .narrow */
+.links { text-align: center; margin: 14px 0 0; }
+.hint { font-size: 13px; color: var(--muted); margin-top: 4px; }
