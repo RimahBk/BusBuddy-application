@@ -1,0 +1,9 @@
+<resources>
+    <!-- No action bar: the website draws its own top bar. Colours match css/style.css -->
+    <style name="Theme.BusBuddy" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">#0F6E56</item>
+        <item name="colorPrimaryDark">#08503F</item>
+        <item name="colorAccent">#534AB7</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
