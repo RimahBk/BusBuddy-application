@@ -199,7 +199,7 @@ class DriverPage extends Page {
     if (this.mapTripId !== trip.trip_id) {          // new trip: draw its route once
       this.mapTripId = trip.trip_id; this.mapLayer.clearLayers(); this.busMarker = null;
       const stops = this.stopsByRoute[trip.route_id] || [];
-      const line = stops.map((s) => [s.latitude, s.longitude]);
+      const line = BB.routeLine(stops);         // road shape if the route has one, else stop to stop
       stops.forEach((s) => L.marker([s.latitude, s.longitude], { icon: BB.stopIcon() }).bindPopup(BB.esc(s.address)).addTo(this.mapLayer));
       if (line.length > 1) L.polyline(line, { color: "#534AB7", weight: 4, opacity: 0.7 }).addTo(this.mapLayer);
       if (line.length) this.map.fitBounds(line, { padding: [20, 20] });

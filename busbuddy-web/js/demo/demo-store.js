@@ -7,7 +7,7 @@
 import { createFixtures } from "./demo-fixtures.js";
 
 export class DemoStore {
-  static STORAGE_KEY = "bb_demo_db";
+  static STORAGE_KEY = "bb_demo_db_v4";  // v4: five routes from data/BusRoutes_edited.geojson (new key = old saved data is not reused)
   static SESSION_KEY = "mock_user";       // user_id of the logged-in demo user
   static MAX_AGE_MS = 6 * 3600000;
   static FIRST_ID = 100;

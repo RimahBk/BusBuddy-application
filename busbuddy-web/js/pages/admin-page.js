@@ -181,7 +181,8 @@ class RoutesTab {
     const stops = this.stops;
     // Draw numbered stops and the line between them
     this.stopLayer.clearLayers();
-    const line = stops.map((s) => [s.latitude, s.longitude]);
+    const route = this.D.routes.find((r) => r.route_id === routeId) || {};
+    const line = BB.routeLine(stops, route.path);   // road shape if the route has one, else stop to stop
     if (line.length > 1) L.polyline(line, { color: "#534AB7", weight: 4, opacity: 0.6 }).addTo(this.stopLayer);
     stops.forEach((s) => L.marker([s.latitude, s.longitude], { icon: BB.stopIcon() }).addTo(this.stopLayer)
       .bindTooltip(String(s.stop_order), { permanent: true, direction: "top", offset: [0, -6], className: "num-tip" })

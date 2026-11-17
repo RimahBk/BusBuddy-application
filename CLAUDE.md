@@ -19,10 +19,11 @@ BusBuddy: a bus-tracking web app for commuters from the Chouf to LIU Cola (a stu
 `js/vendor/supabase.js` → (`js/vendor/leaflet/leaflet.js` on map pages) → `js/config.js` (classic script, sets `window.BB_CONFIG`) → `<script type="module" src="js/pages/<page>-page.js">`.
 Each page module defines `class XxxPage extends Page` (from `js/pages/page.js`) with an `async init()` and ends with `XxxPage.mount()`. Page-only CSS lives in `css/pages/<page>.css`, linked right after `css/style.css`. Vendor libraries are local copies, not CDN links. The JavaScript uses ES modules, so it never works over `file://`.
 
-**`js/core/bb.js` exports `BB`** (also set as `window.BB`). It is a facade over the classes in `js/core/` (`Dom`, `Format`, `Ui`, `Connection`, `Session`, `NavBar`, `Banners`, `Poller`, `MapKit`, `Eta`). Page modules `import { BB } from "../core/bb.js"`. Some functions on `BB` are static methods passed around on their own (pages write `const $ = BB.$`), so static helpers must not use `this`. Inside a class they refer to the class by name. The shared layer every page uses:
+**`js/core/bb.js` exports `BB`** (also set as `window.BB`). It is a facade over the classes in `js/core/` (`Dom`, `Format`, `Ui`, `Connection`, `Session`, `NavBar`, `Banners`, `Poller`, `MapKit`, `Eta`, `RouteStyle`). Page modules `import { BB } from "../core/bb.js"`. Some functions on `BB` are static methods passed around on their own (pages write `const $ = BB.$`), so static helpers must not use `this`. Inside a class they refer to the class by name. The shared layer every page uses:
 - `BB.db`: either the real Supabase client or the demo mock client (see below). Page code always calls `BB.db.from(...)` / `BB.db.rpc(...)` and never checks which mode it is in.
 - `BB.ready(fn)` wraps page start-up (it shows the setup/demo banner and turns errors into toasts). `BB.requireRole([...])` guards protected pages and redirects by role using `BB.HOME`. `BB.renderNav(activePage)` fills `<header id="topbar">` with links chosen per role (the `NAV` table).
 - `BB.poll(fn, seconds)` is how the app gets live updates. It uses polling, not Supabase Realtime, and pauses while the tab is hidden.
+- Routes have colours (`BB.routeColor` / `BB.routeDot`, from `RouteStyle`) and an optional road shape: `routes.path` (jsonb `[[lat, lng], …]`). `BB.loadStopsByRoute()` attaches it as `.path` on each route's stop list, and pages draw lines with `BB.routeLine(stops)`, which falls back to straight lines between stops. Bus markers take `(status, color, heading)` and are moved with `BB.slideMarker` / `BB.setBusHeading`.
 - `BB.computeEta` estimates arrival times: haversine distance × 1.3 road factor ÷ current speed, falling back to the scheduled `minutes_from_start`, plus any reported delay.
 - UI helpers: `BB.toast`, `BB.confirmBox`, `BB.show`, `BB.busy`, `BB.esc`. **Do not use `alert()`/`confirm()`/`prompt()`**, because they don't show in the Android WebView. Always pass user data through `BB.esc` before putting it into `innerHTML`.
 
@@ -33,7 +34,8 @@ Each page module defines `class XxxPage extends Page` (from `js/pages/page.js`) 
 - `DemoQuery`: the chainable query builder.
 - `DemoRpc`: one method per SQL function, with the **same name and columns** as in `schema.sql`.
 - `DemoStore`: the tables and lookup helpers, kept in `localStorage` (`bb_demo_db`, `mock_user`) for about 6 hours.
-- `demo-fixtures.js`: the sample data.
+- `demo-fixtures.js`: the sample data (5 routes). Routes 2–5 come from `data/BusRoutes_edited.geojson`. `node tools/build-routes.js` prints the generated rows for routes 1, 4 and 5 and reads route 2's path out of `GEO_ROUTES` in this file, so keep that `export const GEO_ROUTES = [ … ];` block intact. The GeoJSON is only an input for that tool: pages never load it, and the Android app does not pack it.
+- Changing the shape of the sample data means bumping `DemoStore.STORAGE_KEY` (currently `bb_demo_db_v4`), so browsers drop their saved copy.
 
 When you add or change an SQL function or the columns it returns, make the same change in `DemoRpc`, or the page will break in demo mode. Every method on `DemoRpc` can be called as an RPC, so helper methods go in `DemoStore`.
 

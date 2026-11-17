@@ -6,7 +6,12 @@ Plain HTML, CSS and JavaScript · Supabase (database, login, security, functions
 ## 0. Demo mode (offline, no Supabase or Vercel)
 
 `js/config.js` starts with `DEMO_MODE: true`. In this mode every page works offline with sample data
-(`js/demo-data.js`): one route, two running buses, two upcoming trips, bookings and messages.
+(`js/demo/demo-fixtures.js`): five routes, six running buses, six upcoming trips, bookings and messages.
+Routes 2–5 (Baakline – Cola, Niha – Cola, Saida – Cola, Aley – Cola) come from `data/BusRoutes_edited.geojson`:
+their road shape is stored in the `routes.path` column, their stops are the file's named stops along the road,
+and the minutes between stops share out the file's travel time (90, 120, 60 and 39 min) by distance.
+Route 1 (Chouf – LIU Cola) follows route 2's road from Damour; its Beiteddine – Deir el Qamar part is approximate.
+Routes 4 and 5 and route 1's path are made by `tools/build-routes.js` (run `node tools/build-routes.js`).
 Changes you make (bookings, trips, messages) are kept in the browser for 6 hours; **Reset demo** under the menu starts again.
 
 Demo accounts (any password): `rami@busbuddy.test` passenger · `driver@busbuddy.test` driver · `admin@busbuddy.test` admin.

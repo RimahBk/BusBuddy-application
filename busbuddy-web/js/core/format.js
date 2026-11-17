@@ -17,6 +17,20 @@ export class Format {
     return iso ? Format.date(iso) + ", " + Format.time(iso) : "–";
   }
 
+  // A key to group trips by day ("2026-11-17"-like, local time)
+  static dayKey(d) {
+    const x = new Date(d);
+    return x.getFullYear() + "-" + (x.getMonth() + 1) + "-" + x.getDate();
+  }
+
+  // "Today", "Tomorrow" or a short date
+  static dayLabel(iso) {
+    const key = Format.dayKey(iso), now = new Date();
+    if (key === Format.dayKey(now)) return "Today";
+    if (key === Format.dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))) return "Tomorrow";
+    return Format.date(iso);
+  }
+
   static minutesAgo(iso) {
     return iso ? Math.round((Date.now() - new Date(iso).getTime()) / 60000) : null;
   }

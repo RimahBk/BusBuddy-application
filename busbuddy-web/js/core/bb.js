@@ -17,6 +17,7 @@ import { Banners } from "./banners.js";
 import { Poller } from "./poller.js";
 import { MapKit } from "./map-kit.js";
 import { Eta } from "./eta.js";
+import { RouteStyle } from "./route-style.js";
 
 const cfg = window.BB_CONFIG || {};
 const connection = new Connection(cfg);
@@ -42,6 +43,8 @@ export const BB = {
   fmtDate: Format.date,
   fmtDateTime: Format.dateTime,
   minutesAgo: Format.minutesAgo,
+  dayKey: Format.dayKey,
+  dayLabel: Format.dayLabel,
   badge: Format.badge,
   errText: Format.errText,
   telLink: Format.telLink,
@@ -76,14 +79,22 @@ export const BB = {
     return () => poller.stop();
   },
 
-  // 7. Maps
+  // 7. Maps and route colours
   makeMap: (elementId) => mapKit.makeMap(elementId),
   busIcon: MapKit.busIcon,
   stopIcon: MapKit.stopIcon,
+  setBusHeading: MapKit.setBusHeading,
+  applyBusHeading: MapKit.applyBusHeading,
+  slideMarker: MapKit.slideMarker,
+  routeLine: MapKit.routeLine,
   loadStopsByRoute: () => mapKit.loadStopsByRoute(),
+  ROUTE_COLORS: RouteStyle.COLORS,
+  routeColor: RouteStyle.color,
+  routeDot: RouteStyle.dot,
 
-  // 8. ETA
+  // 8. ETA and directions
   distanceKm: Eta.distanceKm,
+  bearing: Eta.bearing,
   computeEta: Eta.compute
 };
 

@@ -16,6 +16,14 @@ export class Eta {
     return 2 * R * Math.asin(Math.sqrt(a));
   }
 
+  // Direction from point 1 to point 2 in degrees (0 = north, 90 = east)
+  static bearing(lat1, lng1, lat2, lng2) {
+    const rad = Math.PI / 180;
+    const y = Math.sin((lng2 - lng1) * rad) * Math.cos(lat2 * rad);
+    const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lng2 - lng1) * rad);
+    return (Math.atan2(y, x) / rad + 360) % 360;
+  }
+
   // bus = a row from get_live_buses(); stops = that route's stops (sorted)
   // returns [{ stop, minutes }] for the stops still ahead of the bus
   static compute(bus, stops) {

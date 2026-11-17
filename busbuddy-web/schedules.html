@@ -13,21 +13,21 @@
   <header id="topbar"></header>
   <main class="container">
     <h1>Schedules</h1>
-    <div id="route-pick" class="field hidden">
-      <label for="route-select">Route</label>
-      <select id="route-select"></select>
-    </div>
-    <p id="route-info" class="muted"></p>
+
+    <!-- One card per route: name, origin → destination, next departure -->
+    <div id="route-cards" class="route-cards" role="group" aria-label="Choose a route"><p class="muted">Loading routes…</p></div>
 
     <div class="sched-layout">
       <section class="card">
         <h2>Route timeline</h2>
+        <p id="route-info" class="muted"></p>
         <ol id="timeline" class="timeline"><li class="muted">Loading…</li></ol>
       </section>
       <section>
         <h2>Upcoming trips</h2>
         <p id="role-note" class="muted hidden">Only passengers can reserve seats.</p>
         <div id="book-result" class="hidden"></div>
+        <div id="day-tabs" class="tabs" role="tablist" aria-label="Day"></div>
         <div id="trips"><p class="muted">Loading…</p></div>
       </section>
     </div>
