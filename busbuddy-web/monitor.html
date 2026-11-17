@@ -67,7 +67,7 @@
       const stopsByRoute = await BB.loadStopsByRoute();
       const allStops = [];
       Object.values(stopsByRoute).forEach((stops) => {
-        const line = stops.map((s) => [s.latitude, s.longitude]);
+        const line = BB.routeLine(stops);           // road shape if the route has one, else stop to stop
         L.polyline(line, { color: "#534AB7", weight: 4, opacity: 0.6 }).addTo(map);
         stops.forEach((s) => {
           L.marker([s.latitude, s.longitude], { icon: BB.stopIcon() }).addTo(map).bindTooltip(BB.esc(s.address));

@@ -273,7 +273,8 @@
         }
         // Draw numbered stops and the line between them
         stopLayer.clearLayers();
-        const line = stops.map((s) => [s.latitude, s.longitude]);
+        const route = D.routes.find((r) => r.route_id === routeId) || {};
+        const line = BB.routeLine(stops, route.path);   // road shape if the route has one, else stop to stop
         if (line.length > 1) L.polyline(line, { color: "#534AB7", weight: 4, opacity: 0.6 }).addTo(stopLayer);
         stops.forEach((s) => L.marker([s.latitude, s.longitude], { icon: BB.stopIcon() }).addTo(stopLayer)
           .bindTooltip(String(s.stop_order), { permanent: true, direction: "top", offset: [0, -6], className: "num-tip" })

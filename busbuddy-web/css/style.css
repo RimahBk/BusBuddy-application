@@ -206,16 +206,51 @@ tr.warn td { background: var(--amber-light); }
 .map { width: 100%; height: 60vh; min-height: 320px; border-radius: var(--radius); border: 1px solid var(--border); z-index: 0; }
 .map-small { height: 320px; }
 .bus-marker {
+  --route: var(--green);
+  position: relative;
   width: 34px; height: 34px; border-radius: 50%;
-  background: var(--green); color: var(--white); border: 3px solid var(--white);
+  background: var(--route); color: var(--white); border: 3px solid var(--white);
   box-shadow: 0 1px 6px rgba(0,0,0,.35);
   display: grid; place-items: center; font-size: 17px;
 }
-.bus-marker.delayed { background: var(--amber); }
+.bus-marker.delayed { border-color: var(--amber); box-shadow: 0 0 0 2px var(--white), 0 1px 6px rgba(0,0,0,.35); }
+.bus-glyph { position: relative; z-index: 1; line-height: 1; }
+/* Direction arrow: a small triangle on the edge of the circle, turned with transform: rotate() */
+.bus-arrow { position: absolute; inset: -12px; display: none; pointer-events: none; transition: transform .8s ease-out; }
+.bus-arrow.on { display: block; }
+.bus-arrow::before {
+  content: ""; position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+  border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid var(--route);
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
+}
+@media (prefers-reduced-motion: reduce) { .bus-arrow { transition: none; } }
 .stop-marker {
   width: 14px; height: 14px; border-radius: 50%;
   background: var(--white); border: 3px solid var(--purple);
 }
+.route-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; vertical-align: middle; }
+
+/* Route chips (map filter). They scroll sideways on phones instead of wrapping onto many lines. */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin-bottom: 6px; scrollbar-width: thin; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; white-space: nowrap;
+  min-height: 40px; padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--white); color: var(--text); font: inherit; font-size: 14px;
+}
+.chip:hover { border-color: var(--green); }
+.chip[aria-pressed="true"] { background: var(--green-dark); border-color: var(--green-dark); color: var(--white); font-weight: bold; }
+.chip[aria-pressed="true"] .route-dot { box-shadow: 0 0 0 2px var(--white); }
+
+/* Buttons drawn on top of a Leaflet map (Locate me / Nearest stop) */
+.map-tools { background: var(--white); }
+.map-tools button {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  min-height: 40px; padding: 8px 12px; border: none; background: var(--white);
+  font: inherit; font-size: 14px; font-weight: bold; color: var(--green-dark); cursor: pointer; text-align: left;
+}
+.map-tools button + button { border-top: 1px solid var(--border); }
+.map-tools button:hover { background: var(--green-light); }
+.map-tools button:disabled { color: var(--muted); cursor: wait; }
 .leaflet-popup-content { font-size: 14px; line-height: 1.4; }
 .eta-list { margin: 6px 0 0; padding-left: 18px; }
 

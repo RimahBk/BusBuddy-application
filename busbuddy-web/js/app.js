@@ -229,20 +229,102 @@
     return map;
   };
 
-  BB.busIcon = (status) => L.divIcon({
-    className: "", iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -16],
-    html: `<div class="bus-marker ${status === "delayed" ? "delayed" : ""}">🚌</div>`
-  });
-  BB.stopIcon = () => L.divIcon({ className: "", iconSize: [14, 14], iconAnchor: [7, 7], html: '<div class="stop-marker"></div>' });
+  // Each route gets its own colour (a route row may also carry its own `color`)
+  BB.ROUTE_COLORS = ["#534AB7", "#1565C0", "#C2185B", "#00838F", "#6D4C41", "#2E7D32", "#AD1457", "#283593"];
+  BB.routeColor = (route) => {
+    if (route && typeof route === "object") {
+      if (route.color) return route.color;
+      route = route.route_id;
+    }
+    const id = Number(route) || 1;
+    return BB.ROUTE_COLORS[(id - 1) % BB.ROUTE_COLORS.length];
+  };
+  BB.routeDot = (route) => `<span class="route-dot" style="background:${BB.esc(BB.routeColor(route))}"></span>`;
+
+  // Bus marker: a circle in the route's colour with an arrow that shows the direction.
+  // Without a colour it keeps the old look (green, amber when delayed) – used by the monitor and driver pages.
+  BB.busIcon = (status, color, heading) => {
+    const delayed = status === "delayed";
+    const bg = color || (delayed ? "var(--amber)" : "var(--green)");
+    const arrow = heading == null || isNaN(heading) ? `<span class="bus-arrow"></span>`
+      : `<span class="bus-arrow on" style="transform:rotate(${Number(heading)}deg)"></span>`;
+    return L.divIcon({
+      className: "", iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -16],
+      html: `<div class="bus-marker ${delayed ? "delayed" : ""}" style="--route:${BB.esc(bg)}">${arrow}<span class="bus-glyph">🚌</span></div>`
+    });
+  };
+  BB.stopIcon = (color) => L.divIcon({ className: "", iconSize: [14, 14], iconAnchor: [7, 7],
+    html: `<div class="stop-marker"${color ? ` style="border-color:${BB.esc(color)}"` : ""}></div>` });
+
+  // Direction from point 1 to point 2 in degrees (0 = north, 90 = east)
+  BB.bearing = (lat1, lng1, lat2, lng2) => {
+    const rad = Math.PI / 180;
+    const y = Math.sin((lng2 - lng1) * rad) * Math.cos(lat2 * rad);
+    const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lng2 - lng1) * rad);
+    return (Math.atan2(y, x) / rad + 360) % 360;
+  };
+
+  // Turn a bus marker's arrow. The angle is kept continuous (350° → 10° turns 20°, not back 340°).
+  BB.setBusHeading = (marker, deg) => {
+    if (deg == null || isNaN(deg)) return;
+    marker.bb = marker.bb || {};
+    const prev = marker.bb.heading;
+    marker.bb.heading = prev == null ? deg : prev + ((((deg - prev) % 360) + 540) % 360 - 180);
+    BB.applyBusHeading(marker);
+  };
+  BB.applyBusHeading = (marker) => {
+    const el = marker.getElement && marker.getElement();
+    const arrow = el && el.querySelector(".bus-arrow");
+    if (!arrow || !marker.bb || marker.bb.heading == null) return;
+    arrow.style.transform = `rotate(${marker.bb.heading}deg)`;
+    arrow.classList.add("on");
+  };
+
+  // Move a marker smoothly to its new position instead of jumping.
+  // Jumps straight there when the tab is hidden, the move is very long, or the user prefers less motion.
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  BB.slideMarker = (marker, to, ms) => {
+    const target = L.latLng(to), from = marker.getLatLng();
+    marker.bb = marker.bb || {};
+    cancelAnimationFrame(marker.bb.anim);
+    if (reduceMotion || document.hidden || !marker._map || from.equals(target) || from.distanceTo(target) > 3000) {
+      marker.setLatLng(target); return;
+    }
+    const start = performance.now(), dur = ms || 1500;
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - t, 3);   // ease-out
+      marker.setLatLng([from.lat + (target.lat - from.lat) * e, from.lng + (target.lng - from.lng) * e]);
+      if (t < 1) marker.bb.anim = requestAnimationFrame(step);
+    };
+    marker.bb.anim = requestAnimationFrame(step);
+  };
+
+  // "Today", "Tomorrow" or a short date – and a key to group trips by day
+  BB.dayKey = (d) => { const x = new Date(d); return x.getFullYear() + "-" + (x.getMonth() + 1) + "-" + x.getDate(); };
+  BB.dayLabel = (iso) => {
+    const key = BB.dayKey(iso), now = new Date();
+    if (key === BB.dayKey(now)) return "Today";
+    if (key === BB.dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))) return "Tomorrow";
+    return BB.fmtDate(iso);
+  };
 
   // Load the stops of every route once:  { route_id: [stops sorted by stop_order] }
+  // Each list also gets .path = the route's road shape ([lat, lng] points) when the route has one.
   BB.loadStopsByRoute = async () => {
     const out = {};
     if (!BB.db) return out;
     const { data, error } = await BB.db.from("stops").select("*").order("route_id").order("stop_order");
     if (error) throw error;
     (data || []).forEach((s) => { (out[s.route_id] = out[s.route_id] || []).push(s); });
+    const { data: routes } = await BB.db.from("routes").select("*");
+    (routes || []).forEach((r) => { if (out[r.route_id] && Array.isArray(r.path) && r.path.length > 1) out[r.route_id].path = r.path; });
     return out;
+  };
+
+  // The line to draw for a route: its real road shape if known, otherwise straight lines between its stops
+  BB.routeLine = (stops, path) => {
+    const p = path || (stops && stops.path);
+    return Array.isArray(p) && p.length > 1 ? p : (stops || []).map((s) => [s.latitude, s.longitude]);
   };
 
   // ---------------------------------------------------------------

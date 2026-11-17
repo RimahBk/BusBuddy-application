@@ -40,7 +40,8 @@ create table public.routes (
   route_id    bigint generated always as identity primary key,
   name        text not null,
   origin      text not null,
-  destination text not null
+  destination text not null,
+  path        jsonb            -- optional road shape for the map: [[lat, lng], ...] (e.g. from a GeoJSON file)
 );
 
 -- STOP  (belongs to one route)
