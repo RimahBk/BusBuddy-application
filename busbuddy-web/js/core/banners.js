@@ -32,10 +32,13 @@ export class Banners {
          + "<b>driver@busbuddy.test</b> driver · <b>admin@busbuddy.test</b> admin" : "");
     const top = document.getElementById("topbar");
     if (top) top.after(bar); else document.body.prepend(bar);
-    bar.querySelector("#bb-demo-reset").addEventListener("click", async () => {
-      if (!(await Ui.confirmBox("Start the demo again with the original sample data? You will be logged out.", "Reset"))) return;
-      DemoStore.reset();
-      location.href = "index.html";
-    });
+    bar.querySelector("#bb-demo-reset").addEventListener("click", Banners.resetDemo);
+  }
+
+  // "Reset demo" (in the demo bar and in the menu): ask, then start again from the sample data
+  static async resetDemo() {
+    if (!(await Ui.confirmBox("Start the demo again with the original sample data? You will be logged out.", "Reset"))) return;
+    DemoStore.reset();
+    location.href = "index.html";
   }
 }

@@ -18,18 +18,21 @@ import { Poller } from "./poller.js";
 import { MapKit } from "./map-kit.js";
 import { Eta } from "./eta.js";
 import { RouteStyle } from "./route-style.js";
+import { createApi } from "../data/api.js";
 
 const cfg = window.BB_CONFIG || {};
 const connection = new Connection(cfg);
-const session = new Session(connection.db);
-const navBar = new NavBar(session);
+const api = createApi(connection);            // demo or Supabase backend, chosen by DEMO_MODE
+const session = new Session(api);
+const navBar = new NavBar(session, connection.demo ? Banners.resetDemo : null);
 const banners = new Banners(connection);
-const mapKit = new MapKit(cfg, connection.db);
+const mapKit = new MapKit(cfg, api);
 
 export const BB = {
-  // 1. Settings and database connection
+  // 1. Settings and data
   config: cfg,
-  db: connection.db,
+  api,                    // ← pages read and change data ONLY through this (js/data/api.js)
+  db: connection.db,      // the raw client; kept only until every page uses BB.api
   demo: connection.demo,
   configured: connection.configured,
   inApp: navigator.userAgent.includes("BusBuddyApp"),   // the Android app adds "BusBuddyApp" to its user agent
@@ -40,6 +43,7 @@ export const BB = {
   param: Dom.param,
   esc: Dom.esc,
   fmtTime: Format.time,
+  fmtClock: Format.clock,
   fmtDate: Format.date,
   fmtDateTime: Format.dateTime,
   minutesAgo: Format.minutesAgo,
@@ -64,6 +68,7 @@ export const BB = {
 
   // 5. Navigation bar and banners
   renderNav: (active) => navBar.render(active),
+  renderMenu: (active) => navBar.render(active),     // same as renderNav (the name the plan uses)
   setupBanner: () => banners.setup(),
   demoBanner: () => banners.demo(),
 
@@ -80,6 +85,11 @@ export const BB = {
   },
 
   // 7. Maps and route colours
+  map: {
+    create: (elementId) => mapKit.makeMap(elementId),
+    drawRoute: MapKit.drawRoute,       // (map, route, stops, { color, stopPopup }) → layer group
+    busMarker: MapKit.busMarker        // ([lat, lng], { status, color, heading, label }) → marker
+  },
   makeMap: (elementId) => mapKit.makeMap(elementId),
   busIcon: MapKit.busIcon,
   stopIcon: MapKit.stopIcon,
@@ -93,6 +103,7 @@ export const BB = {
   routeDot: RouteStyle.dot,
 
   // 8. ETA and directions
+  eta: Eta.timetable,                  // (bus, stops, delayMinutes) → { stale, minutesAgo, stops: [{ stop, minutes, at }] }
   distanceKm: Eta.distanceKm,
   bearing: Eta.bearing,
   computeEta: Eta.compute

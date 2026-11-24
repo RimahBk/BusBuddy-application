@@ -14,9 +14,11 @@ export class NavBar {
   };
 
   #session;
+  #onResetDemo;   // function for the "Reset demo" menu item, or null outside demo mode
 
-  constructor(session) {
+  constructor(session, onResetDemo) {
     this.#session = session;
+    this.#onResetDemo = onResetDemo || null;
   }
 
   // active = file name of the current page, e.g. "map.html"
@@ -32,6 +34,7 @@ export class NavBar {
         <button class="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
         <nav class="nav-links">${links}
           ${user ? `<span class="nav-user">${Dom.esc(user.full_name)}</span><button id="bb-logout">Log out</button>` : ""}
+          ${this.#onResetDemo ? `<button id="bb-menu-reset">Reset demo</button>` : ""}
         </nav></div>`;
     const toggle = bar.querySelector(".nav-toggle"), nav = bar.querySelector(".nav-links");
     toggle.addEventListener("click", () => {
@@ -40,5 +43,7 @@ export class NavBar {
     });
     const out = document.getElementById("bb-logout");
     if (out) out.addEventListener("click", () => this.#session.logout());
+    const reset = document.getElementById("bb-menu-reset");
+    if (reset) reset.addEventListener("click", this.#onResetDemo);
   }
 }

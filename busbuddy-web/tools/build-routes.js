@@ -166,10 +166,15 @@ function closestNamed(name) {
     .sort((a, b) => a.d - b.d)[0];
 }
 const damour = closestNamed("Damour"), khalde = closestNamed("Khalde");
-const BEITEDDINE = [33.6953, 35.5786], DEIR = [33.6967, 35.5617], LIU_COLA = [33.877, 35.493];   // unchanged, approximate
+const BEITEDDINE = [33.6953, 35.5786], DEIR = [33.6967, 35.5617], LIU_COLA = [33.877, 35.493];
 const damourAt = roundPt(damour.at), khaldeAt = roundPt(khalde.at);
-// LIU Cola is added as the last point, so the line reaches the LIU Cola stop
-const r1path = [BEITEDDINE, DEIR, damourAt, ...r2path.slice(nearestVertex(damourAt, r2path)), LIU_COLA];
+// Beiteddine → Deir el Qamar → Damour: the GeoJSON has no line there, so the real mountain road
+// comes from data/route1-chouf-road.json (OpenStreetMap road network, see "source" in that file).
+// It used to be two straight lines, the second one cutting 10.5 km straight over the mountains.
+const CHOUF_ROAD = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "route1-chouf-road.json"), "utf8")).path;
+if (haversine(CHOUF_ROAD[CHOUF_ROAD.length - 1], damourAt) > 50) throw new Error("route1-chouf-road.json must end at the Damour stop " + damourAt);
+// Then the official line from Damour to Cola; LIU Cola is added as the last point, so the line reaches the LIU Cola stop
+const r1path = [...CHOUF_ROAD.slice(0, -1), damourAt, ...r2path.slice(nearestVertex(damourAt, r2path) + 1), LIU_COLA];
 const r1 = { route_id: 1, name: "Chouf – LIU Cola", line: r1path, totalMin: 60,
   stops: [["Beiteddine", BEITEDDINE, 0], ["Deir el Qamar", DEIR, 8], ["Damour", damourAt, 30], ["Khaldeh", khaldeAt, 42], ["LIU Cola", LIU_COLA, 60]]
     .map(([name, at, minutes]) => ({ name, at, minutes })),

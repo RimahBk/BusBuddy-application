@@ -10,7 +10,7 @@ Plain HTML, CSS and JavaScript · Supabase (database, login, security, functions
 Routes 2–5 (Baakline – Cola, Niha – Cola, Saida – Cola, Aley – Cola) come from `data/BusRoutes_edited.geojson`:
 their road shape is stored in the `routes.path` column, their stops are the file's named stops along the road,
 and the minutes between stops share out the file's travel time (90, 120, 60 and 39 min) by distance.
-Route 1 (Chouf – LIU Cola) follows route 2's road from Damour; its Beiteddine – Deir el Qamar part is approximate.
+Route 1 (Chouf – LIU Cola) follows the real mountain road from Beiteddine via Deir el Qamar to Damour (`data/route1-chouf-road.json`, from the OpenStreetMap road network), then route 2's official line from Damour to Cola.
 Routes 4 and 5 and route 1's path are made by `tools/build-routes.js` (run `node tools/build-routes.js`).
 Changes you make (bookings, trips, messages) are kept in the browser for 6 hours; **Reset demo** under the menu starts again.
 

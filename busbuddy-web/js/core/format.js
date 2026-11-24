@@ -5,29 +5,37 @@
 import { Dom } from "./dom.js";
 
 export class Format {
+  // Every time is shown in Lebanon time, whatever time zone the phone or laptop is set to,
+  // so a passenger abroad and the driver in Lebanon see the same departure time.
+  static TIME_ZONE = (window.BB_CONFIG && window.BB_CONFIG.TIME_ZONE) || "Asia/Beirut";
+
   static time(iso) {
-    return iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "–";
+    return iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: Format.TIME_ZONE }) : "–";
+  }
+
+  // Time with seconds (e.g. "last sent 12:04:10")
+  static clock(iso) {
+    return iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: Format.TIME_ZONE }) : "–";
   }
 
   static date(iso) {
-    return iso ? new Date(iso).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }) : "–";
+    return iso ? new Date(iso).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: Format.TIME_ZONE }) : "–";
   }
 
   static dateTime(iso) {
     return iso ? Format.date(iso) + ", " + Format.time(iso) : "–";
   }
 
-  // A key to group trips by day ("2026-11-17"-like, local time)
+  // A key to group trips by day: "2026-11-17", the calendar day in Lebanon
   static dayKey(d) {
-    const x = new Date(d);
-    return x.getFullYear() + "-" + (x.getMonth() + 1) + "-" + x.getDate();
+    return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: Format.TIME_ZONE }).format(new Date(d));
   }
 
-  // "Today", "Tomorrow" or a short date
+  // "Today", "Tomorrow" or a short date (days counted in Lebanon time)
   static dayLabel(iso) {
-    const key = Format.dayKey(iso), now = new Date();
+    const key = Format.dayKey(iso), now = Date.now();
     if (key === Format.dayKey(now)) return "Today";
-    if (key === Format.dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))) return "Tomorrow";
+    if (key === Format.dayKey(now + 24 * 3600000)) return "Tomorrow";
     return Format.date(iso);
   }
 

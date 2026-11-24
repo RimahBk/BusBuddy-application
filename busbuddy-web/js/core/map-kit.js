@@ -9,13 +9,15 @@ const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-mo
 
 export class MapKit {
   #cfg;
-  #db;
+  #api;
 
-  constructor(cfg, db) {
+  constructor(cfg, api) {
     this.#cfg = cfg;
-    this.#db = db;
+    this.#api = api;
   }
 
+  // A Leaflet map with OpenStreetMap tiles. With no internet the tiles don't load, and
+  // Leaflet's own grey background stays visible: the routes and buses are still drawn on it.
   makeMap(elementId) {
     const map = L.map(elementId).setView(this.#cfg.MAP_CENTER || [33.78, 35.5], this.#cfg.MAP_ZOOM || 11);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -23,6 +25,30 @@ export class MapKit {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
     return map;
+  }
+
+  // Draw one route: its line (road shape, else stop to stop) and its stops, in the route's colour.
+  // Returns a Leaflet layer group, so a page can hide/show the whole route at once.
+  //   options.color      line and stop colour (default purple)
+  //   options.stopPopup  function(stop) → popup HTML for a stop (optional)
+  static drawRoute(map, route, stops, options = {}) {
+    const color = options.color || "#534AB7";
+    const group = L.layerGroup();
+    const line = MapKit.routeLine(stops, route && route.path);
+    if (line.length > 1) L.polyline(line, { color, weight: 4, opacity: 0.85 }).addTo(group);
+    (stops || []).forEach((s) => {
+      const m = L.marker([s.latitude, s.longitude], { icon: MapKit.stopIcon(color) }).addTo(group);
+      m.bindPopup(options.stopPopup ? () => options.stopPopup(s) : Dom.esc(s.address));
+    });
+    group.line = line;                                // the points, handy for map.fitBounds(group.line)
+    return group.addTo(map);
+  }
+
+  // A bus marker at [lat, lng]. options: status, color, heading, label (e.g. the plate, shown under the bus)
+  static busMarker(latlng, options = {}) {
+    const marker = L.marker(latlng, { icon: MapKit.busIcon(options.status, options.color, options.heading) });
+    if (options.label) marker.bindTooltip(Dom.esc(options.label), { permanent: true, direction: "bottom", offset: [0, 14], className: "bus-label" });
+    return marker;
   }
 
   // Bus marker: a circle in the route's colour with an arrow that shows the direction.
@@ -88,11 +114,9 @@ export class MapKit {
   // Each list also gets .path = the route's road shape ([lat, lng] points) when the route has one.
   async loadStopsByRoute() {
     const out = {};
-    if (!this.#db) return out;
-    const { data, error } = await this.#db.from("stops").select("*").order("route_id").order("stop_order");
-    if (error) throw error;
-    (data || []).forEach((s) => { (out[s.route_id] = out[s.route_id] || []).push(s); });
-    const { data: routes } = await this.#db.from("routes").select("*");
+    if (!this.#api) return out;
+    const [stops, routes] = await Promise.all([this.#api.getStops(), this.#api.getRoutes()]);
+    (stops || []).forEach((s) => { (out[s.route_id] = out[s.route_id] || []).push(s); });
     (routes || []).forEach((r) => { if (out[r.route_id] && Array.isArray(r.path) && r.path.length > 1) out[r.route_id].path = r.path; });
     return out;
   }

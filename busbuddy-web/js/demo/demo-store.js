@@ -7,7 +7,7 @@
 import { createFixtures } from "./demo-fixtures.js";
 
 export class DemoStore {
-  static STORAGE_KEY = "bb_demo_db_v4";  // v4: five routes from data/BusRoutes_edited.geojson (new key = old saved data is not reused)
+  static STORAGE_KEY = "bb_demo_db_v6";  // v6: route 1 follows the real Beiteddine – Damour road (v5: more seed data) – new key = old saved data is not reused
   static SESSION_KEY = "mock_user";       // user_id of the logged-in demo user
   static MAX_AGE_MS = 6 * 3600000;
   static FIRST_ID = 100;
@@ -59,4 +59,12 @@ export class DemoStore {
   avail(tid) { const t = this.byId("trips", "trip_id", tid); return this.bus(t.bus_id).capacity - this.seatsTaken(tid); }
   lastLoc(tid) { return this.tables.updated_locations.filter((l) => l.trip_id === tid).slice(-1)[0] || {}; }
   openDelay(tid) { return this.tables.delay_reports.filter((d) => d.trip_id === tid && d.status === "open").slice(-1)[0] || {}; }
+
+  // ---- Who is asking? (the same checks the SQL functions make with auth.uid()) ----
+  isAdmin(me) { return !!me && me.type === "admin"; }
+  isDriverOf(me, trip) { return !!me && !!trip && trip.driver_id === me.user_id; }
+  // Does this passenger hold an active (booked) seat on the trip?
+  hasBooking(tid, passengerId) {
+    return this.tables.bookings.some((b) => b.trip_id === tid && b.passenger_id === passengerId && b.status === "booked");
+  }
 }

@@ -9,7 +9,8 @@ import { DemoQuery } from "./demo-query.js";
 import { DemoRpc } from "./demo-rpc.js";
 
 const ok = (data) => Promise.resolve({ data, error: null });
-const fail = (message) => Promise.resolve({ data: null, error: { message } });
+// Like supabase-js: { message } plus the Postgres error code when there is one (e.g. "23505" = duplicate)
+const fail = (message, code) => Promise.resolve({ data: null, error: code ? { message, code } : { message } });
 
 // db.auth.* – log in / sign up / log out with the demo accounts (any password works)
 class DemoAuth {
@@ -30,7 +31,8 @@ class DemoAuth {
   }
 
   signInWithPassword({ email }) {
-    const u = this.#store.tables.users.find((x) => x.email === email);
+    const wanted = String(email || "").trim().toLowerCase();       // Supabase ignores upper/lower case in emails
+    const u = this.#store.tables.users.find((x) => x.email.toLowerCase() === wanted);
     if (!u) return fail("Invalid login credentials");
     this.#store.setSessionUser(u.user_id);
     return ok({ user: { id: u.user_id, email }, session: { access_token: "mock-token" } });
@@ -76,6 +78,11 @@ export class DemoClient {
     this.auth = new DemoAuth(this.#store);
   }
 
+  // The demo "database" itself. Only js/data/demo-backend.js uses it (to move the demo buses).
+  get store() {
+    return this.#store;
+  }
+
   from(table) {
     return new DemoQuery(this.#store, table);
   }
@@ -85,7 +92,7 @@ export class DemoClient {
     const me = this.#store.sessionUser();
     const out = this.#rpc[name](args || {}, me);
     this.#store.save();
-    if (out && out.error) return fail(out.error);
+    if (out && out.error) return fail(out.error, out.code);
     return new Promise((r) => setTimeout(() => r({ data: out, error: null }), 30));
   }
 }

@@ -1,5 +1,5 @@
 // =====================================================================
-// Demo sample data: five routes, six running buses, upcoming trips,
+// Demo sample data: five routes, six running buses (moved by js/data/demo-backend.js), upcoming trips,
 // bookings and messages. Times are relative to `now`, so the demo always
 // looks "live".
 // Demo accounts (any password works):
@@ -15,7 +15,9 @@ export const DEMO_USERS = {
   driver3: { user_id: "d-3", full_name: "Karim Ghosn", email: "driver3@busbuddy.test", phone_no: "+96170555666", type: "driver" },
   driver4: { user_id: "d-4", full_name: "Fadi Mansour", email: "driver4@busbuddy.test", phone_no: "+96170777888", type: "driver" },
   driver5: { user_id: "d-5", full_name: "Ziad Hamdan", email: "driver5@busbuddy.test", phone_no: "+96170121314", type: "driver" },
-  driver6: { user_id: "d-6", full_name: "Rabih Saleh", email: "driver6@busbuddy.test", phone_no: "+96170151617", type: "driver" }
+  driver6: { user_id: "d-6", full_name: "Rabih Saleh", email: "driver6@busbuddy.test", phone_no: "+96170151617", type: "driver" },
+  passenger3: { user_id: "p-3", full_name: "Nour Khalil", email: "nour@busbuddy.test", phone_no: "+96171000003", type: "passenger" },
+  passenger4: { user_id: "p-4", full_name: "Omar Fares", email: "omar@busbuddy.test", phone_no: "+96171000004", type: "passenger" }
 };
 
 // Primary key column of each table (used when inserting rows)
@@ -108,14 +110,16 @@ export function createFixtures(now) {
             { bus_id: 3, plate_number: "B 234567", capacity: 24, owner_id: "d-3" }, { bus_id: 4, plate_number: "B 345678", capacity: 24, owner_id: "d-4" },  // file: "Bus (24 Seats)"
             { bus_id: 5, plate_number: "S 456789", capacity: 24, owner_id: "d-5" }, { bus_id: 6, plate_number: "A 567890", capacity: 24, owner_id: "d-6" }],
     routes: [{ route_id: 1, name: "Chouf – LIU Cola", origin: "Beiteddine", destination: "LIU Cola",
-               // Beiteddine → Deir el Qamar → Damour: straight lines (approximate, no road data in the GeoJSON);
-               // Damour → Cola: route 2's road from the GeoJSON, then the LIU Cola stop as the last point
-               path: [[33.6953,35.5786],[33.6967,35.5617],[33.72496,35.45335],[33.72485,35.45276],[33.73148,35.45353],[33.73715,35.45395],[33.74814,35.45246],[33.75002,35.45259],[33.75319,35.45446],[33.76227,35.46034],[33.76803,35.46644],[33.77149,35.46894],[33.7771,35.47259],[33.78547,35.47792],[33.79161,35.4819],[33.79385,35.48281],[33.7961,35.48255],[33.79764,35.48278],[33.80672,35.48991],[33.81935,35.4996],[33.82688,35.50528],[33.8273,35.50543],[33.82972,35.50389],[33.83256,35.49989],[33.83394,35.49671],[33.83534,35.4947],[33.83824,35.49459],[33.84261,35.49401],[33.85628,35.49354],[33.86146,35.49399],[33.86721,35.49447],[33.87515,35.49514],[33.877,35.493]] },
+               // Beiteddine → Deir el Qamar → Damour: the real mountain road from data/route1-chouf-road.json
+               //   (OpenStreetMap road network – the GeoJSON has no line there);
+               // Damour → Cola: route 2's official line from the GeoJSON, then the LIU Cola stop as the last point.
+               // Made by tools/build-routes.js.
+               path: [[33.6953,35.5786],[33.69504,35.5786],[33.69539,35.57735],[33.69531,35.57621],[33.69436,35.57486],[33.69451,35.57487],[33.69525,35.5756],[33.69526,35.57538],[33.69425,35.57425],[33.69326,35.57412],[33.69383,35.5736],[33.69455,35.57345],[33.69523,35.57356],[33.69508,35.57206],[33.69513,35.5713],[33.69595,35.5688],[33.69586,35.56623],[33.696,35.56453],[33.69622,35.5643],[33.69627,35.5639],[33.69619,35.56323],[33.69563,35.56175],[33.69499,35.56075],[33.69485,35.56034],[33.69481,35.55951],[33.69507,35.55868],[33.6955,35.55909],[33.69616,35.55938],[33.69606,35.55995],[33.69698,35.56235],[33.69678,35.56248],[33.69658,35.56236],[33.69645,35.56245],[33.69658,35.56236],[33.69678,35.56248],[33.69698,35.56235],[33.69606,35.55995],[33.69616,35.55938],[33.6955,35.55909],[33.69507,35.55868],[33.69539,35.55826],[33.69585,35.55816],[33.69624,35.55727],[33.69598,35.55471],[33.69576,35.55413],[33.69515,35.55344],[33.69495,35.553],[33.69526,35.55215],[33.69569,35.55139],[33.69572,35.55008],[33.69518,35.548],[33.69489,35.54459],[33.69455,35.54218],[33.69338,35.53806],[33.69251,35.5329],[33.69146,35.53062],[33.6909,35.52883],[33.69015,35.52752],[33.68981,35.52617],[33.68913,35.52463],[33.6892,35.52416],[33.68953,35.52394],[33.69143,35.52419],[33.6916,35.52404],[33.68959,35.52286],[33.68863,35.5214],[33.68826,35.51976],[33.68824,35.51745],[33.68939,35.51494],[33.68988,35.51238],[33.69031,35.51081],[33.69045,35.50916],[33.68962,35.50765],[33.68909,35.5063],[33.68804,35.50533],[33.68769,35.50483],[33.68774,35.50329],[33.68821,35.50065],[33.68805,35.50023],[33.68779,35.49996],[33.68684,35.49983],[33.68652,35.49957],[33.6864,35.49807],[33.68684,35.49707],[33.68819,35.4959],[33.68868,35.49513],[33.68876,35.49405],[33.68933,35.49211],[33.68879,35.49105],[33.68854,35.48997],[33.6886,35.4896],[33.68919,35.48909],[33.69053,35.4883],[33.69213,35.4868],[33.69271,35.48593],[33.69289,35.48461],[33.69305,35.48418],[33.6935,35.48376],[33.69459,35.48312],[33.69565,35.48158],[33.69698,35.47998],[33.69711,35.48001],[33.69714,35.48021],[33.69585,35.48274],[33.6955,35.48373],[33.6955,35.48426],[33.69624,35.48548],[33.69654,35.48551],[33.69726,35.48507],[33.69751,35.48506],[33.69861,35.48635],[33.69924,35.48674],[33.69945,35.48668],[33.69942,35.48653],[33.6986,35.48601],[33.69829,35.48522],[33.69798,35.48384],[33.69774,35.48333],[33.69778,35.48305],[33.69846,35.48205],[33.69895,35.47963],[33.69926,35.47885],[33.69842,35.47716],[33.69786,35.47552],[33.69793,35.4742],[33.69873,35.47301],[33.70008,35.47205],[33.70062,35.47129],[33.70077,35.47082],[33.70082,35.4691],[33.70097,35.46871],[33.70209,35.46832],[33.7026,35.4683],[33.70292,35.46848],[33.70323,35.46905],[33.70341,35.46907],[33.70369,35.46854],[33.70453,35.46809],[33.70507,35.46741],[33.70517,35.46601],[33.70481,35.46423],[33.70496,35.46347],[33.70607,35.46088],[33.70691,35.45929],[33.70754,35.45855],[33.70885,35.4555],[33.70877,35.45442],[33.70821,35.4533],[33.70732,35.45262],[33.70593,35.45215],[33.70545,35.45183],[33.70531,35.45127],[33.70533,35.45067],[33.7055,35.45023],[33.70659,35.44983],[33.70778,35.45026],[33.70855,35.44937],[33.70925,35.44911],[33.71176,35.45026],[33.71493,35.45134],[33.71758,35.4519],[33.725,35.45276],[33.72496,35.45335],[33.73148,35.45353],[33.73715,35.45395],[33.74814,35.45246],[33.75002,35.45259],[33.75319,35.45446],[33.76227,35.46034],[33.76803,35.46644],[33.77149,35.46894],[33.7771,35.47259],[33.78547,35.47792],[33.79161,35.4819],[33.79385,35.48281],[33.7961,35.48255],[33.79764,35.48278],[33.80672,35.48991],[33.81935,35.4996],[33.82688,35.50528],[33.8273,35.50543],[33.82972,35.50389],[33.83256,35.49989],[33.83394,35.49671],[33.83534,35.4947],[33.83824,35.49459],[33.84261,35.49401],[33.85628,35.49354],[33.86146,35.49399],[33.86721,35.49447],[33.87515,35.49514],[33.877,35.493]] },
              ...copy(GEO_ROUTES.map((g) => g.route))],
     stops: [
       { stop_id: 1, route_id: 1, address: "Beiteddine", latitude: 33.6953, longitude: 35.5786, stop_order: 1, minutes_from_start: 0 },
       { stop_id: 2, route_id: 1, address: "Deir el Qamar", latitude: 33.6967, longitude: 35.5617, stop_order: 2, minutes_from_start: 8 },
-      // Beiteddine and Deir el Qamar are not in the GeoJSON, so their coordinates are approximate.
+      // Beiteddine and Deir el Qamar are not in the GeoJSON; both lie on the road of route1-chouf-road.json (within 5 m).
       // Damour and Khaldeh: the file's "Damour" (B6-B1) and "Khalde" (B6-A7) points nearest route 2.
       { stop_id: 3, route_id: 1, address: "Damour", latitude: 33.72496, longitude: 35.45335, stop_order: 3, minutes_from_start: 30 },
       { stop_id: 4, route_id: 1, address: "Khaldeh", latitude: 33.78757, longitude: 35.47908, stop_order: 4, minutes_from_start: 42 },
@@ -136,13 +140,21 @@ export function createFixtures(now) {
       { trip_id: 11, route_id: 5, bus_id: 6, driver_id: "d-6", departure_time: iso(now - 15 * min), status: "active" },    // Aley – Cola
       { trip_id: 12, route_id: 5, bus_id: 6, driver_id: "d-6", departure_time: iso(now + 260 * min), status: "scheduled" },
       { trip_id: 13, route_id: 4, bus_id: 5, driver_id: "d-5", departure_time: iso(now + 330 * min), status: "scheduled" },  // Saida – Cola, later trip
-      { trip_id: 14, route_id: 5, bus_id: 6, driver_id: "d-6", departure_time: iso(now + 380 * min), status: "scheduled" }   // Aley – Cola, later trip
+      { trip_id: 14, route_id: 5, bus_id: 6, driver_id: "d-6", departure_time: iso(now + 380 * min), status: "scheduled" },  // Aley – Cola, later trip
+      { trip_id: 15, route_id: 1, bus_id: 1, driver_id: "d-1", departure_time: iso(now + 420 * min), status: "scheduled" },  // Chouf – LIU Cola: the "next bus" when trip 4 is full
+      { trip_id: 16, route_id: 1, bus_id: 1, driver_id: "d-1", departure_time: iso(now - 26 * 60 * min), status: "completed" } // yesterday
     ],
     bookings: [
       { booking_id: 1, passenger_id: "p-1", trip_id: 3, nb_of_seats: 2, status: "booked", booking_time: iso(now - 600 * min) },
       { booking_id: 2, passenger_id: "p-2", trip_id: 3, nb_of_seats: 1, status: "booked", booking_time: iso(now - 500 * min) },
       { booking_id: 3, passenger_id: "p-1", trip_id: 1, nb_of_seats: 1, status: "booked", booking_time: iso(now - 900 * min) },
-      { booking_id: 4, passenger_id: null, trip_id: 1, nb_of_seats: 2, status: "walk_on", booking_time: iso(now - 10 * min) }
+      { booking_id: 4, passenger_id: null, trip_id: 1, nb_of_seats: 2, status: "walk_on", booking_time: iso(now - 10 * min) },
+      // Trip 4 (bus M 654321, 14 seats) is almost full: 12 taken, 2 left → booking 3 or 4 seats offers the next bus
+      { booking_id: 5, passenger_id: "p-2", trip_id: 4, nb_of_seats: 4, status: "booked", booking_time: iso(now - 400 * min) },
+      { booking_id: 6, passenger_id: "p-3", trip_id: 4, nb_of_seats: 4, status: "booked", booking_time: iso(now - 300 * min) },
+      { booking_id: 7, passenger_id: "p-4", trip_id: 4, nb_of_seats: 4, status: "booked", booking_time: iso(now - 200 * min) },
+      // Rami's past trip (yesterday)
+      { booking_id: 8, passenger_id: "p-1", trip_id: 16, nb_of_seats: 1, status: "booked", booking_time: iso(now - 30 * 60 * min) }
     ],
     messages: [
       { message_id: 1, trip_id: 1, passenger_id: "p-1", driver_id: "d-1", content: "Hi, I'm waiting at Damour by the pharmacy.", status: "read", date_time: iso(now - 12 * min), sent_by: "passenger" },
@@ -150,12 +162,12 @@ export function createFixtures(now) {
     ],
     delay_reports: [{ report_id: 1, trip_id: 2, reason: "Traffic", delay_time: 15, status: "open", time_of_report: iso(now - 8 * min) }],
     updated_locations: [
-      { location_id: 1, trip_id: 1, latitude: 33.71854, longitude: 35.47798, time: iso(now - 20000), speed: 42 }, // on the road, 25 min after leaving (by the timetable)
-      { location_id: 2, trip_id: 2, latitude: 33.79112, longitude: 35.48158, time: iso(now - 5 * min), speed: 0 },     // stopped (delayed) near Khaldeh, on the road
-      { location_id: 3, trip_id: 5, latitude: 33.69708, longitude: 35.48, time: iso(now - 15000), speed: 38 },    // on the Baakline road, 1/3 of the way
-      { location_id: 4, trip_id: 7, latitude: 33.68322, longitude: 35.5382, time: iso(now - 25000), speed: 35 },  // on the Niha road, near Baakline
-      { location_id: 5, trip_id: 9, latitude: 33.66395, longitude: 35.42238, time: iso(now - 20000), speed: 40 },  // Saida road, 20 of 60 min along
-      { location_id: 6, trip_id: 11, latitude: 33.83412, longitude: 35.56753, time: iso(now - 20000), speed: 40 }  // Aley road, 15 of 39 min along
+      { location_id: 1, trip_id: 1, latitude: 33.70491, longitude: 35.46371, time: iso(now - 20000), speed: 42, simulated: true }, // on the road, 25 min after leaving (by the timetable)
+      { location_id: 2, trip_id: 2, latitude: 33.79112, longitude: 35.48158, time: iso(now - 5 * min), speed: 0, simulated: true },     // stopped (delayed) near Khaldeh, on the road
+      { location_id: 3, trip_id: 5, latitude: 33.69708, longitude: 35.48, time: iso(now - 15000), speed: 38, simulated: true },    // on the Baakline road, 1/3 of the way
+      { location_id: 4, trip_id: 7, latitude: 33.68322, longitude: 35.5382, time: iso(now - 25000), speed: 35, simulated: true },  // on the Niha road, near Baakline
+      { location_id: 5, trip_id: 9, latitude: 33.66395, longitude: 35.42238, time: iso(now - 20000), speed: 40, simulated: true },  // Saida road, 20 of 60 min along
+      { location_id: 6, trip_id: 11, latitude: 33.83412, longitude: 35.56753, time: iso(now - 20000), speed: 40, simulated: true }  // Aley road, 15 of 39 min along
     ]
   };
 }
